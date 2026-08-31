@@ -1,3 +1,45 @@
+## [1.20.1](https://github.com/InfiniBrains/mobagen/compare/v1.20.0...v1.20.1) (2026-08-31)
+
+
+### Bug Fixes
+
+* remove some leftovers from the transition to webgpu ([4ac25c9](https://github.com/InfiniBrains/mobagen/commit/4ac25c9b18c9561935e054dc721d65eff153d3a2))
+
+# [1.20.0](https://github.com/InfiniBrains/mobagen/compare/v1.19.5...v1.20.0) (2026-08-31)
+
+
+### Bug Fixes
+
+* add delta time ([5cdd5e7](https://github.com/InfiniBrains/mobagen/commit/5cdd5e74cda68823b0fb40b87beddbb26a66057d))
+* flocking rules ([70ddfa7](https://github.com/InfiniBrains/mobagen/commit/70ddfa7911c9ed8f2bd820e604b0f52bf44eb5d6))
+* **flocking:** normalize FLOCKING_TESTS_DIR to forward slashes for MSVC ([80de23d](https://github.com/InfiniBrains/mobagen/commit/80de23d33837744af50869b99b7aca43fb690183))
+
+
+### Features
+
+* **flocking:** flocking-tests runner driving existing rules with pass-percentage report ([0274107](https://github.com/InfiniBrains/mobagen/commit/02741070569506fdcb47bfc2c86dfc9d897fe16e))
+
+## [1.19.5](https://github.com/InfiniBrains/mobagen/compare/v1.19.4...v1.19.5) (2026-08-28)
+
+
+### Bug Fixes
+
+* **dawn:** fail fast with actionable message when python3/jinja2 missing ([a661bf5](https://github.com/InfiniBrains/mobagen/commit/a661bf54127abbc75618ca6e067edabc1ca4f841))
+
+## [1.19.4](https://github.com/InfiniBrains/mobagen/compare/v1.19.3...v1.19.4) (2026-08-28)
+
+
+### Bug Fixes
+
+* **build:** reject non-visual-studio toolchains on windows with actionable error ([62a0018](https://github.com/InfiniBrains/mobagen/commit/62a0018d820e93e7479f0e29085f607c49d45b65))
+
+## [1.19.3](https://github.com/InfiniBrains/mobagen/compare/v1.19.2...v1.19.3) (2026-08-28)
+
+
+### Bug Fixes
+
+* sdl dependency ([f4955dc](https://github.com/InfiniBrains/mobagen/commit/f4955dc9dd46e8fb25cd5bb1b80fb7ba4407ca66))
+
 ## [1.19.2](https://github.com/InfiniBrains/mobagen/compare/v1.19.1...v1.19.2) (2026-08-27)
 
 
