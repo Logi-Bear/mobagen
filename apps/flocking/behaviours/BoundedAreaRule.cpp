@@ -9,7 +9,33 @@ glm::vec2 BoundedAreaRule::computeForce(const std::vector<BoidView>& neighborhoo
   // desiredDistance is the distance from the borders that the boids should try to maintain. 
 
   // begin solution
+  float displayWidth = displaySize.x;
+  float displayHeight = displaySize.y;
 
+  float lookAheadFrames = 5.f;
+  glm::vec2 futurePos = boid.position + (boid.velocity * lookAheadFrames);
+
+  // Left wall
+  if (futurePos.x < desiredDistance) {
+    float penetration = desiredDistance - futurePos.x;
+    force.x += penetration;
+  }
+  // Right wall
+  else if (futurePos.x > displayWidth - desiredDistance) {
+    float penetration = futurePos.x - (displayWidth - desiredDistance);
+    force.x -= penetration;
+  }
+
+  // Top wall
+  if (futurePos.y < desiredDistance) {
+    float penetration = desiredDistance - futurePos.y;
+    force.y += penetration;
+  }
+  // Bottom wall
+  else if (futurePos.y > displayHeight - desiredDistance) {
+    float penetration = futurePos.y - (displayHeight - desiredDistance);
+    force.y -= penetration;
+  }
   // end solution
 
   return force;
