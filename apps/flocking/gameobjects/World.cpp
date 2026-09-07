@@ -22,12 +22,12 @@
 FlockingManager::FlockingManager(ecs::World& world, jobs::Scheduler& sched) : ecs_(world), sched_(sched) {}
 
 void FlockingManager::initializeRules() {
-  boidsRules.emplace_back(std::make_unique<SeparationRule>(25.f, 90.f));
-  boidsRules.emplace_back(std::make_unique<CohesionRule>(60.f));
-  boidsRules.emplace_back(std::make_unique<AlignmentRule>(2.9f));
-  boidsRules.emplace_back(std::make_unique<MouseInfluenceRule>(2.f));
-  boidsRules.emplace_back(std::make_unique<BoundedAreaRule>(20, 8.0f, true));
-  boidsRules.emplace_back(std::make_unique<WindRule>(1.f, 6.f, false));
+  boidsRules.emplace_back(std::make_unique<SeparationRule>(40.f, 250.f));
+  boidsRules.emplace_back(std::make_unique<CohesionRule>(300.f));
+  boidsRules.emplace_back(std::make_unique<AlignmentRule>(1.75f));
+  boidsRules.emplace_back(std::make_unique<MouseInfluenceRule>(50.f));
+  boidsRules.emplace_back(std::make_unique<BoundedAreaRule>(100, 30.0f, false));
+  boidsRules.emplace_back(std::make_unique<WindRule>(45.f, 180.f, false));
 
   defaultWeights.clear();
   for (const auto& rule : boidsRules) defaultWeights.push_back(rule->weight);

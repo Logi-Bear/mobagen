@@ -3,6 +3,44 @@
 #include <glm/glm.hpp>
 #include <algorithm>
 
+float BoundedAreaRule::raycastToBounds(glm::vec2 rayOrigin, glm::vec2 rayDirection, float boundsWidth, float boundsHeight, float maxSearchDistance) {
+  float closestHitDistance = maxSearchDistance;
+  float leftBound   = desiredDistance;
+  float rightBound  = boundsWidth  - desiredDistance;
+  float topBound    = desiredDistance;
+  float bottomBound = boundsHeight - desiredDistance;
+
+  if (rayDirection.x < 0.f) {
+    float distanceToLeftWall = (leftBound - rayOrigin.x) / rayDirection.x;
+    if (distanceToLeftWall > 0.f && distanceToLeftWall < closestHitDistance) {
+      float hitY = rayOrigin.y + distanceToLeftWall * rayDirection.y;
+      if (hitY >= topBound && hitY <= bottomBound) closestHitDistance = distanceToLeftWall;
+    }
+  } else if (rayDirection.x > 0.f) {
+    float distanceToRightWall = (rightBound - rayOrigin.x) / rayDirection.x;
+    if (distanceToRightWall > 0.f && distanceToRightWall < closestHitDistance) {
+      float hitY = rayOrigin.y + distanceToRightWall * rayDirection.y;
+      if (hitY >= topBound && hitY <= bottomBound) closestHitDistance = distanceToRightWall;
+    }
+  }
+
+  if (rayDirection.y < 0.f) {
+    float distanceToTopWall = (topBound - rayOrigin.y) / rayDirection.y;
+    if (distanceToTopWall > 0.f && distanceToTopWall < closestHitDistance) {
+      float hitX = rayOrigin.x + distanceToTopWall * rayDirection.x;
+      if (hitX >= leftBound && hitX <= rightBound) closestHitDistance = distanceToTopWall;
+    }
+  } else if (rayDirection.y > 0.f) {
+    float distanceToBottomWall = (bottomBound - rayOrigin.y) / rayDirection.y;
+    if (distanceToBottomWall > 0.f && distanceToBottomWall < closestHitDistance) {
+      float hitX = rayOrigin.x + distanceToBottomWall * rayDirection.x;
+      if (hitX >= leftBound && hitX <= rightBound) closestHitDistance = distanceToBottomWall;
+    }
+  }
+
+  return closestHitDistance;
+}
+
 glm::vec2 BoundedAreaRule::computeForce(const std::vector<BoidView>& neighborhood, const BoidView& boid) {
   glm::vec2 force(0.f);
   ImVec2 displaySize = ImGui::GetIO().DisplaySize;
@@ -12,29 +50,48 @@ glm::vec2 BoundedAreaRule::computeForce(const std::vector<BoidView>& neighborhoo
   float displayWidth = displaySize.x;
   float displayHeight = displaySize.y;
 
-  float lookAheadFrames = 5.f;
-  glm::vec2 futurePos = boid.position + (boid.velocity * lookAheadFrames);
+  float searchAngle = glm::radians(90.f);
+  float cosAngle = cos(searchAngle);
+  float sinAngle = sin(searchAngle);
 
-  // Left wall
-  if (futurePos.x < desiredDistance) {
-    float penetration = desiredDistance - futurePos.x;
-    force.x += penetration;
-  }
-  // Right wall
-  else if (futurePos.x > displayWidth - desiredDistance) {
-    float penetration = futurePos.x - (displayWidth - desiredDistance);
-    force.x -= penetration;
-  }
+  glm::vec2 headingDirection = glm::normalize(boid.velocity);
+  glm::vec2 leftSearchDirection(headingDirection.x * cosAngle - headingDirection.y * sinAngle, headingDirection.x * sinAngle + headingDirection.y * cosAngle);
+  glm::vec2 rightSearchDirection(headingDirection.x * cosAngle + headingDirection.y * sinAngle, -headingDirection.x * sinAngle + headingDirection.y * cosAngle);
 
-  // Top wall
-  if (futurePos.y < desiredDistance) {
-    float penetration = desiredDistance - futurePos.y;
-    force.y += penetration;
+  float wallScanDistance = 200.f;
+
+  float steerPower = 15.f;
+
+  float forwardHitDistance = raycastToBounds(boid.position, headingDirection, displayWidth, displayHeight, wallScanDistance);
+  float leftHitDistance = raycastToBounds(boid.position, leftSearchDirection, displayWidth, displayHeight, wallScanDistance * .75f);
+  float rightHitDistance = raycastToBounds(boid.position, rightSearchDirection, displayWidth, displayHeight, wallScanDistance *.75f);
+
+  float searchHitDistance = glm::min(forwardHitDistance, glm::min(leftHitDistance, rightHitDistance));
+
+  if (boid.position.x < desiredDistance || boid.position.x > displayWidth - desiredDistance || boid.position.y < desiredDistance || boid.position.y > displayHeight - desiredDistance)
+  {
+    force.x += .015f * ((displayWidth * .5f) - boid.position.x);
+    force.y += .015f * ((displayHeight * .5f) - boid.position.y);
   }
-  // Bottom wall
-  else if (futurePos.y > displayHeight - desiredDistance) {
-    float penetration = futurePos.y - (displayHeight - desiredDistance);
-    force.y -= penetration;
+  else if (searchHitDistance < wallScanDistance)
+  {
+    float avoidanceAngle = glm::radians(90.f);
+
+    float cosAvoidAngle = cos(avoidanceAngle);
+    float sinAvoidAngle = sin(avoidanceAngle);
+    glm::vec2 leftScanDirection(headingDirection.x * cosAvoidAngle - headingDirection.y * sinAvoidAngle, headingDirection.x * sinAvoidAngle + headingDirection.y * cosAvoidAngle);
+    glm::vec2 rightScanDirection(headingDirection.x * cosAvoidAngle + headingDirection.y * sinAvoidAngle, -headingDirection.x * sinAvoidAngle + headingDirection.y * cosAvoidAngle);
+    float leftAvoidDistance  = raycastToBounds(boid.position, leftScanDirection,  displayWidth, displayHeight, wallScanDistance);
+    float rightAvoidDistance = raycastToBounds(boid.position, rightScanDirection, displayWidth, displayHeight, wallScanDistance);
+
+    glm::vec2 avoidanceDirection;
+    if (leftAvoidDistance > rightAvoidDistance)
+      avoidanceDirection = leftScanDirection;
+    else if (rightAvoidDistance > leftAvoidDistance)
+      avoidanceDirection = rightScanDirection;
+    else
+      avoidanceDirection = glm::vec2(0, 0);
+    force += avoidanceDirection * steerPower;
   }
   // end solution
 

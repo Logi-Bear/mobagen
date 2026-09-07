@@ -7,7 +7,14 @@ glm::vec2 WindRule::computeForce(const std::vector<BoidView>& neighborhood, cons
   // windAngle is the angle of the wind direction in degrees, so we need to convert it to radians by multiplying it by (pi / 180).
   
   // begin solution
-  return glm::vec2(0,0);
+  glm::vec2 force(0,0);
+
+  float cosWindAngle = glm::cos(windAngle);
+  float sinWindAngle = glm::sin(windAngle);
+
+  force = glm::vec2(cosWindAngle, sinWindAngle);
+
+  return force;
   // end solution
 }
 
