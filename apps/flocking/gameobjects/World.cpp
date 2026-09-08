@@ -27,7 +27,7 @@ void FlockingManager::initializeRules() {
   boidsRules.emplace_back(std::make_unique<AlignmentRule>(1.75f));
   boidsRules.emplace_back(std::make_unique<MouseInfluenceRule>(50.f));
   boidsRules.emplace_back(std::make_unique<BoundedAreaRule>(100, 30.0f, false));
-  boidsRules.emplace_back(std::make_unique<WindRule>(45.f, 180.f, false));
+  boidsRules.emplace_back(std::make_unique<WindRule>(45.f, 0.f, false));
 
   defaultWeights.clear();
   for (const auto& rule : boidsRules) defaultWeights.push_back(rule->weight);
