@@ -3,6 +3,10 @@
 #include "RecursiveBacktrackerExample.h"
 #include <climits>
 
+static const Color32 kCurrent = {0.5f, 1.0f, 0.5f, 1.0f};
+static const Color32 kStackHighlight = {0.3f, 0.15f, 0.15f, 1.0f};
+static const Color32 kBlack = {0.0f, 0.0f, 0.0f, 1.0f};
+
 // Recursive backtracker, in FORMAL units: (0, 0) is the top-left cell, x grows
 // right, y grows down. The caller seeds SeededRandom before the first Step;
 // every decision consumes the seed in order, so the maze is deterministic.
@@ -58,11 +62,25 @@ bool RecursiveBacktrackerExample::Step(World* w) {
     Point2D const point = stack.back();
     visited[point.x][point.y] = true;
 
+    Point2D const worldCurrent = w->ToWorldCoords(point);
+    w->SetNodeColor(worldCurrent, kCurrent);
+
+    for (size_t i = 0; i + 1 < stack.size(); ++i)
+    {
+      Point2D const worldStackPoint = w->ToWorldCoords(stack[i]);
+      w->SetNodeColor(worldStackPoint, kStackHighlight);
+    }
+
     std::vector<Point2D> const visitables = getVisitables(w, point);
 
     if (visitables.empty())
     {
+      w->SetNodeColor(worldCurrent, kBlack);
       stack.pop_back();
+      if (!stack.empty())
+      {
+        w->SetNodeColor(w->ToWorldCoords(stack.back()), kCurrent);
+      }
     }
     else
     {
@@ -76,13 +94,12 @@ bool RecursiveBacktrackerExample::Step(World* w) {
         next = visitables.at(SeededRandom::next() % visitables.size());
       }
       stack.emplace_back(next);
-      Point2D const worldCurrent = w->ToWorldCoords(point);
+
       if (next.y < point.y)       {w->SetNorth(worldCurrent, false);}
       else if (next.x > point.x)  {w->SetEast(worldCurrent, false);}
       else if (next.y > point.y)  {w->SetSouth(worldCurrent, false);}
       else if (next.x < point.x)  {w->SetWest(worldCurrent, false);}
     }
-
     if (!stack.empty())
     {
       return true;
@@ -102,8 +119,35 @@ std::vector<Point2D> RecursiveBacktrackerExample::getVisitables(World* w, const 
 
   std::vector<Point2D> visitables;
 
-  if (!visited[formalPoint.x][formalPoint.y])
+  Point2D const up{formalPoint.x, formalPoint.y - 1};
+  Point2D const right{formalPoint.x + 1, formalPoint.y};
+  Point2D const down{formalPoint.x, formalPoint.y + 1};
+  Point2D const left{formalPoint.x - 1, formalPoint.y};
 
+    if (!visited[up.x][up.y])
+    {
+      if (0 <= up.x && up.x < w->GetWidth() && 0 <= up.y && up.y < w->GetHeight()) {
+        visitables.push_back(up);
+      }
+    }
+    if (!visited[right.x][right.y])
+    {
+      if (0 <= right.x && right.x < w->GetWidth() && 0 <= right.y && right.y < w->GetHeight()) {
+        visitables.push_back(right);
+      }
+    }
+    if (!visited[down.x][down.y])
+    {
+      if (0 <= down.x && down.x < w->GetWidth() && 0 <= down.y && down.y < w->GetHeight()) {
+        visitables.push_back(down);
+      }
+    }
+    if (!visited[left.x][left.y])
+    {
+      if (0 <= left.x && left.x < w->GetWidth() && 0 <= left.y && left.y < w->GetHeight()) {
+        visitables.push_back(left);
+      }
+    }
   // end solution
-  return {};
+  return visitables;
 }
