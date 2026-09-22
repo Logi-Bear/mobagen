@@ -60,24 +60,22 @@ bool RecursiveBacktrackerExample::Step(World* w) {
     Point2D const point = stack.back();
     visited[point.x][point.y] = true;
 
-    Point2D const worldCurrent = w->ToWorldCoords(point);
-    w->SetNodeColor(worldCurrent, kCurrent);
+    w->SetNodeColor(point, kCurrent);
 
     for (size_t i = 0; i + 1 < stack.size(); ++i)
     {
-      Point2D const worldStackPoint = w->ToWorldCoords(stack[i]);
-      w->SetNodeColor(worldStackPoint, kStackHighlight);
+      w->SetNodeColor(stack[i], kStackHighlight);
     }
 
     std::vector<Point2D> const visitables = getVisitables(w, point);
 
     if (visitables.empty())
     {
-      w->SetNodeColor(worldCurrent, kBlack);
+      w->SetNodeColor(point, kBlack);
       stack.pop_back();
       if (!stack.empty())
       {
-        w->SetNodeColor(w->ToWorldCoords(stack.back()), kCurrent);
+        w->SetNodeColor(stack.back(), kCurrent);
       }
     }
     else
@@ -93,10 +91,10 @@ bool RecursiveBacktrackerExample::Step(World* w) {
       }
       stack.emplace_back(next);
 
-      if (next.y < point.y)       {w->SetNorth(worldCurrent, false);}
-      else if (next.x > point.x)  {w->SetEast(worldCurrent, false);}
-      else if (next.y > point.y)  {w->SetSouth(worldCurrent, false);}
-      else if (next.x < point.x)  {w->SetWest(worldCurrent, false);}
+      if (next.y < point.y)       {w->SetNorth(point, false);}
+      else if (next.x > point.x)  {w->SetEast(point, false);}
+      else if (next.y > point.y)  {w->SetSouth(point, false);}
+      else if (next.x < point.x)  {w->SetWest(point, false);}
     }
     if (!stack.empty())
     {
@@ -117,10 +115,10 @@ std::vector<Point2D> RecursiveBacktrackerExample::getVisitables(World* w, const 
 
   std::vector<Point2D> visitables;
 
-  Point2D const up{formalPoint.x, formalPoint.y - 1};
-  Point2D const right{formalPoint.x + 1, formalPoint.y};
-  Point2D const down{formalPoint.x, formalPoint.y + 1};
-  Point2D const left{formalPoint.x - 1, formalPoint.y};
+  Point2D const up{point.x, point.y - 1};
+  Point2D const right{point.x + 1, point.y};
+  Point2D const down{point.x, point.y + 1};
+  Point2D const left{point.x - 1, point.y};
 
     if (!visited[up.x][up.y])
     {

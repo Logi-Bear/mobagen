@@ -7,11 +7,10 @@ static const Color32 kCurrent = {1.0f, 1.0f, 1.0f, 1.0f};
 static const Color32 kBlack = {0.f, 0.f, 0.f, 1.0f};
 
 static void openWallBetween(World* w, const Point2D& from, const Point2D& to) {
-  Point2D const worldFrom = w->ToWorldCoords(from);
-  if (to.y < from.y)      { w->SetNorth(worldFrom, false); }
-  else if (to.x > from.x) { w->SetEast(worldFrom, false); }
-  else if (to.y > from.y) { w->SetSouth(worldFrom, false); }
-  else if (to.x < from.x) { w->SetWest(worldFrom, false); }
+  if (to.y < from.y)      { w->SetNorth(from, false); }
+  else if (to.x > from.x) { w->SetEast(from, false); }
+  else if (to.y > from.y) { w->SetSouth(from, false); }
+  else if (to.x < from.x) { w->SetWest(from, false); }
 }
 
 bool HuntAndKillExample::Step(World* w) {
@@ -19,14 +18,14 @@ bool HuntAndKillExample::Step(World* w) {
     // --- walk phase ---
     Point2D const current = stack.back();
     visited[current.y][current.x] = true;
-    w->SetNodeColor(w->ToWorldCoords(current), kCurrent);
+    w->SetNodeColor(current, kCurrent);
 
     std::vector<Point2D> const visitables = getVisitables(w, current);
 
     if (visitables.empty()) {
       // dead end: this walk is over. Dim the final cell and leave the
       // stack empty to signal "hunt phase" on the next Step call.
-      w->SetNodeColor(w->ToWorldCoords(current), kBlack);
+      w->SetNodeColor(current, kBlack);
       stack.pop_back();
     } else {
       Point2D next;
@@ -40,8 +39,8 @@ bool HuntAndKillExample::Step(World* w) {
       visited[next.y][next.x] = true;
 
       // the old current cell is no longer active; dim it, then move on
-      w->SetNodeColor(w->ToWorldCoords(current), kBlack);
-      w->SetNodeColor(w->ToWorldCoords(next), kCurrent);
+      w->SetNodeColor(current, kBlack);
+      w->SetNodeColor(next, kCurrent);
       stack.back() = next;
     }
 
@@ -62,7 +61,7 @@ bool HuntAndKillExample::Step(World* w) {
     Point2D const start = randomStartPoint(w);
     if (start.x == INT_MAX) { return false; } // shouldn't happen on an empty grid, but just in case
     visited[start.y][start.x] = true;
-    w->SetNodeColor(w->ToWorldCoords(start), kCurrent);
+    w->SetNodeColor(start, kCurrent);
     stack.push_back(start);
     return true;
   }
@@ -84,7 +83,7 @@ bool HuntAndKillExample::Step(World* w) {
 
       openWallBetween(w, neighbor, candidate);
       visited[candidate.y][candidate.x] = true;
-      w->SetNodeColor(w->ToWorldCoords(candidate), kCurrent);
+      w->SetNodeColor(candidate, kCurrent);
       stack.push_back(candidate);
       return true;
     }
