@@ -4,8 +4,8 @@
 #include <climits>
 
 static const Color32 kCurrent = {0.5f, 1.0f, 0.5f, 1.0f};
-static const Color32 kStackHighlight = {0.3f, 0.15f, 0.15f, 1.0f};
-static const Color32 kBlack = {0.0f, 0.0f, 0.0f, 1.0f};
+static const Color32 kStackHighlight = {1.0f, 0.5f, 0.5f, 1.0f};
+static const Color32 kWhite = {1.0f, 1.0f, 1.0f, 1.0f};
 
 // Recursive backtracker, in FORMAL units: (0, 0) is the top-left cell, x grows
 // right, y grows down. The caller seeds SeededRandom before the first Step;
@@ -71,7 +71,7 @@ bool RecursiveBacktrackerExample::Step(World* w) {
 
     if (visitables.empty())
     {
-      w->SetNodeColor(point, kBlack);
+      w->SetNodeColor(point, kWhite);
       stack.pop_back();
       if (!stack.empty())
       {

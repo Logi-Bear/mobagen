@@ -6,7 +6,7 @@
 #include <chrono>
 
 // Dark gray background color for unvisited cells (169, 169, 169)
-static const Color32 kDarkGray = {169.0f / 255.0f, 169.0f / 255.0f, 169.0f / 255.0f, 1.0f};
+static const Color32 kUnvisited = {0.0f, 0.0f, 0.0f, 1.0f};  // black
 
 World::World(int size) : width(size), height(size) {
   generators.push_back(new PrimExample());
@@ -119,18 +119,7 @@ void World::OnDraw() {
   float dispX = (winW / 2.0f) - linesize * (width / 2.0f) - linesize / 2.0f;
   float dispY = (winH / 2.0f) - linesize * (height / 2.0f) - linesize / 2.0f;
 
-  const ImU32 wallColor = IM_COL32(255, 255, 255, 255);
-
-  // Draw walls: each pair (data[i] = north wall, data[i+1] = west wall)
-  for (int i = 0; i < (int)data.size(); i += 2) {
-    float px = (float)((i / 2) % (width + 1)) * linesize + dispX;
-    float py = (float)((i / 2) / (width + 1)) * linesize + dispY;
-
-    // north (horizontal line at top of cell)
-    if (data[i]) dl->AddLine(ImVec2(px, py), ImVec2(px + linesize, py), wallColor);
-    // west (vertical line at left of cell)
-    if (data[i + 1]) dl->AddLine(ImVec2(px, py), ImVec2(px, py + linesize), wallColor);
-  }
+  const ImU32 wallColor = IM_COL32(0, 0, 0, 255);
 
   // Draw cell background colors
   for (int i = 0; i < width * height; i++) {
@@ -140,7 +129,18 @@ void World::OnDraw() {
 
     float px = (float)(i % width) * linesize + dispX;
     float py = (float)(i / width) * linesize + dispY;
-    dl->AddRectFilled(ImVec2(px + 1.0f, py + 1.0f), ImVec2(px + linesize, py + linesize), cellColor);
+    dl->AddRectFilled(ImVec2(px, py), ImVec2(px + linesize, py + linesize), cellColor);
+  }
+
+  // Draw walls: each pair (data[i] = north wall, data[i+1] = west wall)
+  for (int i = 0; i < (int)data.size(); i += 2) {
+    float px = (float)((i / 2) % (width + 1)) * linesize + dispX;
+    float py = (float)((i / 2) / (width + 1)) * linesize + dispY;
+
+    // north (horizontal line at top of cell)
+    if (data[i]) dl->AddLine(ImVec2(px, py), ImVec2(px + linesize, py), wallColor, 5.0f);
+    // west (vertical line at left of cell)
+    if (data[i + 1]) dl->AddLine(ImVec2(px, py), ImVec2(px, py + linesize), wallColor, 5.0f);
   }
 }
 
@@ -173,7 +173,7 @@ void World::Clear() {
   // clear the color of the boxes;
   colors.clear();
   colors.resize(width * height);
-  for (int i = 0; i < width * height; i++) colors[i] = kDarkGray;
+  for (int i = 0; i < width * height; i++) colors[i] = kUnvisited;
 
   // clear maze generators
   for (int i = 0; i < (int)generators.size(); i++) generators[i]->Clear(this);
