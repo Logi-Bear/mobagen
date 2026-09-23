@@ -87,7 +87,7 @@ void World::OnGui() {
   }
   ImGui::Text("Move duration: %lli", moveDuration);
   ImGui::Text("Total duration: %lli", totalTime);
-  ImGui::SliderFloat("Turn Duration", &timeBetweenAITicks, 0.00, 30);
+  ImGui::SliderFloat("Turn Duration", &timeBetweenAITicks, 0.00, 1);
   ImGui::Text("Next turn in %.1f", timeForNextTick);
 
   ImGui::Text("Generator: %s", generators[generatorId]->GetName().c_str());

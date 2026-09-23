@@ -3,8 +3,9 @@
 #include "../SeededRandom.h"
 #include <climits>
 
-static const Color32 kCurrent = {1.0f, 1.0f, 1.0f, 1.0f};
-static const Color32 kBlack = {0.f, 0.f, 0.f, 1.0f};
+static const Color32 kCurrent = {0.5f, 1.0f, 0.5f, 1.0f};
+static const Color32 kStackHighlight = {0.125f, 0.125f, 0.125f, 1.0f};
+static const Color32 kBlack = {0.0f, 0.0f, 0.0f, 1.0f};
 
 static void openWallBetween(World* w, const Point2D& from, const Point2D& to) {
   if (to.y < from.y)      { w->SetNorth(from, false); }
@@ -68,6 +69,9 @@ bool HuntAndKillExample::Step(World* w) {
 
   for (int y = 0; y < w->GetHeight(); ++y) {
     for (int x = 0; x < w->GetWidth(); ++x) {
+      // highlight the cell the hunt is currently checking
+      w->SetNodeColor(Point2D{x, y}, kStackHighlight);
+
       if (visited[y][x]) continue;
 
       Point2D const candidate{x, y};
