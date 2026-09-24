@@ -7,16 +7,9 @@ static const Color32 kCurrent = {0.5f, 1.0f, 0.5f, 1.0f};
 static const Color32 kStackHighlight = {1.0f, 0.5f, 0.5f, 1.0f};
 static const Color32 kWhite = {1.0f, 1.0f, 1.0f, 1.0f};
 
-static void openWallBetween(World* w, const Point2D& from, const Point2D& to) {
-  if (to.y < from.y)      { w->SetNorth(from, false); }
-  else if (to.x > from.x) { w->SetEast(from, false); }
-  else if (to.y > from.y) { w->SetSouth(from, false); }
-  else if (to.x < from.x) { w->SetWest(from, false); }
-}
-
 bool HuntAndKillExample::Step(World* w) {
   if (!stack.empty()) {
-    // --- walk phase ---
+    //walk phase
     Point2D const current = stack.back();
     visited[current.y][current.x] = true;
     w->SetNodeColor(current, kCurrent);
@@ -36,7 +29,10 @@ bool HuntAndKillExample::Step(World* w) {
         next = visitables.at(SeededRandom::next() % visitables.size());
       }
 
-      openWallBetween(w, current, next);
+      if (next.y < current.y)      { w->SetNorth(current, false); }
+      else if (next.x > current.x) { w->SetEast(current, false); }
+      else if (next.y > current.y) { w->SetSouth(current, false); }
+      else if (next.x < current.x) { w->SetWest(current, false); }
       visited[next.y][next.x] = true;
 
       // the old current cell is no longer active; dim it, then move on
@@ -52,7 +48,10 @@ bool HuntAndKillExample::Step(World* w) {
   bool anyVisited = false;
   for (auto const& row : visited) {
     for (auto const& cell : row.second) {
-      if (cell.second) { anyVisited = true; break; }
+      if (cell.second) {
+        anyVisited = true;
+        break;
+      }
     }
     if (anyVisited) break;
   }
@@ -60,7 +59,6 @@ bool HuntAndKillExample::Step(World* w) {
   if (!anyVisited) {
     // very first call: nothing to connect to yet, just seed the walk
     Point2D const start = randomStartPoint(w);
-    if (start.x == INT_MAX) { return false; } // shouldn't happen on an empty grid, but just in case
     visited[start.y][start.x] = true;
     w->SetNodeColor(start, kCurrent);
     stack.push_back(start);
@@ -85,7 +83,10 @@ bool HuntAndKillExample::Step(World* w) {
         neighbor = visitedNeighbors.at(SeededRandom::next() % visitedNeighbors.size());
       }
 
-      openWallBetween(w, neighbor, candidate);
+      if (candidate.y < neighbor.y)      { w->SetNorth(neighbor, false); }
+      else if (candidate.x > neighbor.x) { w->SetEast(neighbor, false); }
+      else if (candidate.y > neighbor.y) { w->SetSouth(neighbor, false); }
+      else if (candidate.x < neighbor.x) { w->SetWest(neighbor, false); }
       visited[candidate.y][candidate.x] = true;
       w->SetNodeColor(candidate, kCurrent);
       stack.push_back(candidate);
