@@ -4,7 +4,7 @@
 #include <climits>
 
 static const Color32 kCurrent = {0.5f, 1.0f, 0.5f, 1.0f};
-static const Color32 kStackHighlight = {0.75f, 0.75f, 0.75f, 1.0f};
+static const Color32 kStackHighlight = {1.0f, 0.5f, 0.5f, 1.0f};
 static const Color32 kWhite = {1.0f, 1.0f, 1.0f, 1.0f};
 
 static void openWallBetween(World* w, const Point2D& from, const Point2D& to) {
@@ -26,7 +26,7 @@ bool HuntAndKillExample::Step(World* w) {
     if (visitables.empty()) {
       // dead end: this walk is over. Dim the final cell and leave the
       // stack empty to signal "hunt phase" on the next Step call.
-      w->SetNodeColor(current, kWhite);
+      w->SetNodeColor(current, kStackHighlight);
       stack.pop_back();
     } else {
       Point2D next;
@@ -40,7 +40,7 @@ bool HuntAndKillExample::Step(World* w) {
       visited[next.y][next.x] = true;
 
       // the old current cell is no longer active; dim it, then move on
-      w->SetNodeColor(current, kWhite);
+      w->SetNodeColor(current, kStackHighlight);
       w->SetNodeColor(next, kCurrent);
       stack.back() = next;
     }
@@ -70,7 +70,7 @@ bool HuntAndKillExample::Step(World* w) {
   for (int y = 0; y < w->GetHeight(); ++y) {
     for (int x = 0; x < w->GetWidth(); ++x) {
       // highlight the cell the hunt is currently checking
-      w->SetNodeColor(Point2D{x, y}, kStackHighlight);
+      w->SetNodeColor(Point2D{x, y}, kWhite);
 
       if (visited[y][x]) continue;
 

@@ -138,9 +138,9 @@ void World::OnDraw() {
     float py = (float)((i / 2) / (width + 1)) * linesize + dispY;
 
     // north (horizontal line at top of cell)
-    if (data[i]) dl->AddLine(ImVec2(px, py), ImVec2(px + linesize, py), wallColor, 5.0f);
+    if (data[i]) dl->AddLine(ImVec2(px, py), ImVec2(px + linesize, py), wallColor, 7.5f);
     // west (vertical line at left of cell)
-    if (data[i + 1]) dl->AddLine(ImVec2(px, py), ImVec2(px, py + linesize), wallColor, 5.0f);
+    if (data[i + 1]) dl->AddLine(ImVec2(px, py), ImVec2(px, py + linesize), wallColor, 7.5f);
   }
 }
 
