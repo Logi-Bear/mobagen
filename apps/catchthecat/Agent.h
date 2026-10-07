@@ -35,6 +35,7 @@ public:
 protected:
   static constexpr int NOT_REACHABLE = 1000000;
   static constexpr int OFF_BOARD = -1;
+  static constexpr int TEMPLATE_PLAN_MAX_STEPS = 20;  // longest escape plan tried against a template catcher
 
   // A fast, editable copy of the board for imagining future moves.
   class SearchBoard {
@@ -112,6 +113,17 @@ protected:
   // The best step for the cat by the simple rules in SpotRating, with no lookahead.
   // Used against fence builders, where running straight for the exit works best.
   static CatStep bestStepForCat(const SearchBoard& board);
+
+  // The default generatePath makes a catcher that searches outward from the
+  // cat (in the game's neighbor order) and walls the first edge cell it finds. That rule
+  // is fully predictable, so against it the cat can plan an exact escape.
+  static int templateCatcherWall(const SearchBoard& board);
+
+  // The first step of the fastest escape against a template catcher, or OFF_BOARD if
+  // none was found within the time limit (then the caller should use another plan).
+  static int bestStepAgainstTemplateCatcher(const SearchBoard& board, int thinkingTimeMs);
+  static bool escapesTemplateCatcher(SearchBoard& board, int step, int stepsLeft,
+                                     std::chrono::steady_clock::time_point deadline);
 
   // The search engine both agents use: plays the next few moves out in its head
   // (minimax with alpha-beta pruning) and picks the move that holds up best.

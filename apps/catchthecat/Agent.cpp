@@ -128,6 +128,67 @@ Agent::CatStep Agent::bestStepForCat(const SearchBoard& board) {
 
 
 
+// Planning against a catcher built from the default template
+
+int Agent::templateCatcherWall(const SearchBoard& board) {
+  // Breadth-first search from the cat; the first edge cell discovered is the one it walls.
+  // neighborsOf() uses the same order as CatWorld::neighbors(), so ties break the same way.
+  vector<bool> visited(board.cellCount(), false);
+  vector<int> frontier{board.catCell()};
+  visited[board.catCell()] = true;
+  for (size_t next = 0; next < frontier.size(); next++)
+    for (int neighbor : board.neighborsOf(frontier[next])) {
+      if (!board.isOpen(neighbor) || visited[neighbor]) continue;
+      visited[neighbor] = true;
+      if (board.isEdge(neighbor)) return neighbor;
+      frontier.push_back(neighbor);
+    }
+  return OFF_BOARD;  // the cat can't reach the edge at all
+}
+
+// Does stepping onto `step` lead to an escape within `stepsLeft` more cat steps,
+// if the catcher always answers with the template's wall?
+bool Agent::escapesTemplateCatcher(SearchBoard& board, int step, int stepsLeft, chrono::steady_clock::time_point deadline) {
+  if (board.isEdge(step)) return true;
+  if (stepsLeft == 0 || chrono::steady_clock::now() > deadline) return false;
+
+  int previousCat = board.catCell();
+  board.moveCatTo(step);
+  int wall = templateCatcherWall(board);
+  if (wall != OFF_BOARD) board.placeWall(wall);
+
+  bool escapes = false;
+  vector<int> shortest = board.shortestEscapeSteps();
+  for (int nextStep : board.openNeighborsOf(step)) {
+    bool canStillMakeIt = shortest[nextStep] <= stepsLeft - 1;  // otherwise it can't reach the edge in time
+    if (canStillMakeIt && escapesTemplateCatcher(board, nextStep, stepsLeft - 1, deadline)) {
+      escapes = true;
+      break;
+    }
+  }
+
+  if (wall != OFF_BOARD) board.removeWall(wall);
+  board.moveCatTo(previousCat);
+  return escapes;
+}
+
+int Agent::bestStepAgainstTemplateCatcher(const SearchBoard& startingBoard, int thinkingTimeMs) {
+  SearchBoard board = startingBoard;
+  auto deadline = chrono::steady_clock::now() + chrono::milliseconds(thinkingTimeMs);
+  vector<int> shortest = board.shortestEscapeSteps();
+  // Look for escapes of 1 step, then 2, then 3, ...: the first one found is the fastest.
+  for (int stepsAllowed = 1; stepsAllowed <= TEMPLATE_PLAN_MAX_STEPS; stepsAllowed++) {
+    for (int step : board.openNeighborsOf(board.catCell())) {
+      if (shortest[step] > stepsAllowed - 1) continue;
+      if (escapesTemplateCatcher(board, step, stepsAllowed - 1, deadline)) return step;
+    }
+    if (chrono::steady_clock::now() > deadline) break;
+  }
+  return OFF_BOARD;
+}
+
+
+
 // GameSearch: minimax with alpha-beta pruning and iterative deepening
 
 Agent::GameSearch::GameSearch(const SearchBoard& startingBoard, int thinkingTimeMs)
