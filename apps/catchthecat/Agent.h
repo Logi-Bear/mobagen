@@ -2,6 +2,8 @@
 #define AGENT_H
 
 #include <glm/glm.hpp>
+#include <array>
+#include <chrono>
 #include <functional>
 #include <vector>
 
@@ -31,21 +33,52 @@ public:
   std::vector<Point2D> generatePath(CatWorld* w);
 
 protected:
-static const int NOT_REACHABLE = 1000000;
+  static const int NOT_REACHABLE = 1000000;
+  static const int OFF_BOARD = -1;
 
-  // One number for every cell on the board, stored in a flat list laid out like worldState().
-  // Lets numbers on the board to be given values for multiple uses
-  class CellNumbers {
+  // A fast, editable copy of the board for imagining future moves.
+  // A cell is just an int, and each cell's six neighbors are looked up once.
+  class SearchBoard {
   public:
-    CellNumbers(const CatWorld& world, int startingValue);
-    int get(Point2D cell) const;
-    void set(Point2D cell, int value);
-    int countCellsNotEqualTo(int value) const;
+    explicit SearchBoard(const CatWorld& world);
+
+    int cellCount() const { return (int)walls.size(); }
+    int catCell() const { return cat; }
+    bool isOpen(int cell) const { return cell != OFF_BOARD && !walls[cell]; }
+    bool isEdge(int cell) const { return edgeCells[cell]; }
+    const std::array<int, 6>& neighborsOf(int cell) const { return neighborTable[cell]; }
+    std::vector<int> openNeighborsOf(int cell) const;
+
+    void placeWall(int cell) { walls[cell] = true; }
+    void removeWall(int cell) { walls[cell] = false; }
+    void moveCatTo(int cell) { cat = cell; }
+
+    int toCell(Point2D point) const { return (point.y + half) * side + (point.x + half); }
+    Point2D toPoint(int cell) const { return {cell % side - half, cell / side - half}; }
+
+    // Steps from the start cells to every open cell.
+    std::vector<int> stepsFrom(const std::vector<int>& startCells, int neighborsNeeded) const;
+
+    // Fewest steps from each cell to the edge, if nobody gets in the way.
+    std::vector<int> shortestEscapeSteps() const { return stepsFrom(openEdgeCells(), 1); }
+
+    // Fewest steps from each cell to the edge even if the catcher blocks the cat's
+    // best move every turn. Since one way forward always gets blocked, a cell only
+    // counts if TWO of its neighbors lead out.
+    std::vector<int> guaranteedEscapeSteps() const { return stepsFrom(openEdgeCells(), 2); }
+
+    // How many open cells the cat could still reach from this cell.
+    int roomAround(int cell) const;
 
   private:
-    int indexOf(Point2D cell) const;
+    std::vector<int> openEdgeCells() const;
+
     int side;
-    std::vector<int> numbers;
+    int half;
+    int cat;
+    std::vector<bool> walls;
+    std::vector<bool> edgeCells;
+    std::vector<std::array<int, 6>> neighborTable;
   };
 
   // Everything the cat cares about when deciding where to step.
@@ -63,32 +96,41 @@ static const int NOT_REACHABLE = 1000000;
 
   struct CatStep {
     bool canMove = false;  // false means the cat is completely surrounded
-    Point2D cell = {0, 0};
+    int cell = OFF_BOARD;
     SpotRating rating;
   };
 
-  static bool isOpen(const CatWorld& world, Point2D cell);
-  static std::vector<Point2D> allCells(const CatWorld& world);
-  static std::vector<Point2D> openNeighbors(const CatWorld& world, Point2D cell);
-  static std::vector<Point2D> openEdgeCells(const CatWorld& world);
+  // The best step for the cat by the simple rules in SpotRating, with no lookahead.
+  static CatStep bestStepForCat(const SearchBoard& board);
 
-  // Spreads outward from the start cells and counts how many steps away every open cell is.
-  // A cell only counts as reached once `neighborsNeeded` of its neighbors have been reached.
-  static CellNumbers countStepsFrom(const CatWorld& world, const std::vector<Point2D>& startCells, int neighborsNeeded);
+  // The cat's search engine: plays the next few moves out in its head
+  // (minimax with alpha-beta pruning) and picks the step that holds up best.
+  class CatSearch {
+  public:
+    CatSearch(const SearchBoard& startingBoard, int thinkingTimeMs);
 
-  // Fewest steps from each cell to the edge, if nobody gets in the way.
-  static CellNumbers shortestEscapeSteps(const CatWorld& world);
+    // The best step found before time ran out, or OFF_BOARD if the cat can't move.
+    int bestStep();
 
-  // Fewest steps from each cell to the edge even if the catcher blocks the cat's
-  // best move every turn. Since one way forward always gets blocked, a cell only
-  // counts if TWO of its neighbors lead out.
-  static CellNumbers guaranteedEscapeSteps(const CatWorld& world);
+  private:
+    // Scores are from the cat's point of view: higher is better for the cat.
+    static const int ESCAPED = 1000000;    // minus moves played, so faster escapes score higher
+    static const int TRAPPED = -1000000;   // plus moves played, so later captures score higher
+    static const int SEALED_IN = -100000;  // plus pocket size, so bigger pockets score higher
+    static const int IMAGINED_WALL_RADIUS = 2;  // catcher walls considered within this many steps of the cat
+    static const int MAX_DEPTH = 12;
 
-  // How many open cells the cat could still reach from this cell.
-  static int roomAround(const CatWorld& world, Point2D cell);
+    int searchCatTurn(int depthLeft, int alpha, int beta, int movesPlayed);
+    int searchCatcherTurn(int depthLeft, int alpha, int beta, int movesPlayed);
+    int scorePosition() const;
+    std::vector<int> catStepsBestFirst() const;
+    std::vector<int> catcherWallChoices() const;
+    bool outOfTime();
 
-  // The best step the cat can take on this board, and how good it is.
-  static CatStep bestStepForCat(const CatWorld& world);
+    SearchBoard board;
+    std::chrono::steady_clock::time_point deadline;
+    bool timeRanOut = false;
+  };
 };
 
 #endif  // AGENT_H
