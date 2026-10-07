@@ -161,6 +161,7 @@ protected:
     int searchCatcherTurn(int depthLeft, int alpha, int beta, int movesPlayed);
     int scorePosition();
     bool catWinsLadder(int stepsLeft);
+    int countOpenEdgeNeighbors(int cell) const;
     int countNearbyExits(int stepsAllowed) const;
     int countOpenCellsNearCat(int radius) const;
     std::vector<int> catStepsBestFirst() const;
