@@ -154,12 +154,15 @@ protected:
     static constexpr int EXIT_LOOKAHEAD_STEPS = 2;
     static constexpr int LADDER_CHECK_RANGE = 2;  // when planning for the catcher: read ladders once the cat is this close to the edge
     static constexpr int LADDER_MAX_STEPS = 12;   // how far the ladder reader follows a run along the edge
+    static constexpr int CONTAINMENT_WEIGHT = 100;
+    static constexpr int CONTAINMENT_RADIUS = 3;
 
     int searchCatTurn(int depthLeft, int alpha, int beta, int movesPlayed);
     int searchCatcherTurn(int depthLeft, int alpha, int beta, int movesPlayed);
     int scorePosition();
     bool catWinsLadder(int stepsLeft);
     int countNearbyExits(int stepsAllowed) const;
+    int countOpenCellsNearCat(int radius) const;
     std::vector<int> catStepsBestFirst() const;
     std::vector<int> catcherWallChoices() const;
     std::vector<int> firstWallChoices() const;
