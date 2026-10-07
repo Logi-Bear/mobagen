@@ -33,8 +33,8 @@ public:
   std::vector<Point2D> generatePath(CatWorld* w);
 
 protected:
-  static const int NOT_REACHABLE = 1000000;
-  static const int OFF_BOARD = -1;
+  static constexpr int NOT_REACHABLE = 1000000;
+  static constexpr int OFF_BOARD = -1;
 
   // A fast, editable copy of the board for imagining future moves.
   class SearchBoard {
@@ -44,6 +44,7 @@ protected:
     int cellCount() const { return (int)walls.size(); }
     int catCell() const { return cat; }
     bool isOpen(int cell) const { return cell != OFF_BOARD && !walls[cell]; }
+    bool hasOpenNeighbor(int cell) const;
     bool isEdge(int cell) const { return edgeCells[cell]; }
     const std::array<int, 6>& neighborsOf(int cell) const { return neighborTable[cell]; }
     std::vector<int> openNeighborsOf(int cell) const;
@@ -56,7 +57,7 @@ protected:
     Point2D toPoint(int cell) const { return {cell % side - half, cell / side - half}; }
 
     // Steps from the start cells to every open cell.
-    std::vector<int> stepsFrom(const std::vector<int>& startCells, int neighborsNeeded) const;
+    std::vector<int> stepsFrom(const std::vector<int>& startCells, int neighborsNeeded, int maxSteps = NOT_REACHABLE) const;
 
     // Fewest steps from each cell to the edge, if nobody gets in the way.
     std::vector<int> shortestEscapeSteps() const { return stepsFrom(openEdgeCells(), 1); }
@@ -75,9 +76,17 @@ protected:
     int side;
     int half;
     int cat;
-    std::vector<bool> walls;
-    std::vector<bool> edgeCells;
+
+    // One byte per cell. Plain bytes instead of std::vector<bool>, which packs
+    // 8 cells into each byte and makes every lookup slower, and these are checked constantly.
+    std::vector<unsigned char> walls;
+    std::vector<unsigned char> edgeCells;
+    std::vector<int> edgeCellList;                  // every edge cell, so we don't scan the whole board to find them
     std::vector<std::array<int, 6>> neighborTable;
+
+    // Working memory for stepsFrom, reused between calls instead of reallocated every time.
+    mutable std::vector<int> scratchTimesReached;
+    mutable std::vector<int> scratchFrontier;
   };
 
   // Everything the cat cares about when deciding where to step.
@@ -122,21 +131,20 @@ protected:
 
   private:
     // Scores are from the cat's point of view: higher is better for the cat.
-    static const int ESCAPED = 1000000;    // minus moves played, so faster escapes score higher
-    static const int TRAPPED = -1000000;   // plus moves played, so later captures score higher
-    static const int SEALED_IN = -100000;  // plus pocket size, so bigger pockets score higher
-    static const int IMAGINED_WALL_RADIUS = 2;  // inside the search: catcher walls considered within this many steps of the cat
-    static const int FIRST_WALL_RADIUS = 5;     // the catcher's actual move: walls considered within this many steps
-    static const int FIRST_WALL_RADIUS_SEALED = 3;
-    static const int ESCAPE_ROUTE_RADIUS = 5;   // when planning for the catcher: also imagine walls on the cat's
-                                                // escape routes up to this many steps away (stops edge-runners)
-    static const int MAX_DEPTH = 12;
-    static const int NEARBY_EXIT_WEIGHT = 50;   // For closing exits ahead of the cat instead of chasing it.
-    static const int EXIT_LOOKAHEAD_STEPS = 2;
-    static const int FENCE_EXTRA_STEPS = 2;  // against a fencer: imagine edge walls up to this many steps past the nearest exit
-    static const int LADDER_CHECK_RANGE = 2;  // when planning for the catcher: read ladders once the cat is this close to the edge
-    static const int LADDER_MAX_STEPS = 12;   // how far the ladder reader follows a run along the edge
-                                              // against a fencer: imagine edge walls up to this many steps past the nearest exit
+    static constexpr int ESCAPED = 1000000;    // minus moves played, so faster escapes score higher
+    static constexpr int TRAPPED = -1000000;   // plus moves played, so later captures score higher
+    static constexpr int SEALED_IN = -100000;  // plus pocket size, so bigger pockets score higher
+    static constexpr int IMAGINED_WALL_RADIUS = 2;  // inside the search: catcher walls considered within this many steps of the cat
+    static constexpr int FIRST_WALL_RADIUS = 5;     // the catcher's actual move: walls considered within this many steps
+    static constexpr int FIRST_WALL_RADIUS_SEALED = 3;
+    static constexpr int ESCAPE_ROUTE_RADIUS = 5;   // when planning for the catcher: also imagine walls on the cat's
+                                                    // escape routes up to this many steps away (stops edge-runners)
+    static constexpr int MAX_DEPTH = 12;
+    static constexpr int NEARBY_EXIT_WEIGHT = 50;   // For closing exits ahead of the cat instead of chasing it.
+    static constexpr int EXIT_LOOKAHEAD_STEPS = 2;
+    static constexpr int FENCE_EXTRA_STEPS = 2;  // against a fencer: imagine edge walls up to this many steps past the nearest exit
+    static constexpr int LADDER_CHECK_RANGE = 2;  // when planning for the catcher: read ladders once the cat is this close to the edge
+    static constexpr int LADDER_MAX_STEPS = 12;   // how far the ladder reader follows a run along the edge
 
     int searchCatTurn(int depthLeft, int alpha, int beta, int movesPlayed);
     int searchCatcherTurn(int depthLeft, int alpha, int beta, int movesPlayed);
