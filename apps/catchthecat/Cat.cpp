@@ -6,13 +6,11 @@
 // How long the search may think per move. Testing showed no difference between 3ms and 40ms,
 // and every millisecond costs points through the tournament's time penalty.
 static const int THINKING_TIME_MS = 4;
-static const int FENCE_THINKING_TIME_MS = 10;
 
 // How many more walls than "random chance" the edge needs before we decide the
 // catcher is building a fence along it.
-static const double EXTRA_EDGE_WALLS_FOR_FENCE = 4;
+static const double EXTRA_EDGE_WALLS_FOR_FENCE = 2;
 
-// Check density of edge walls vs walls scattered randomly away from cat.
 static bool catcherIsFencingTheEdge(const CatWorld& world) {
   int half = world.getWorldSideSize() / 2;
   Point2D cat = world.getCat();
@@ -56,7 +54,7 @@ Point2D Cat::Move(CatWorld* world) {
 
   if (catcherIsFencingTheEdge(*world)) {
     // Race to the edge against a catcher that can only wall edge cells.
-    chosenCell = GameSearch(board, FENCE_THINKING_TIME_MS).bestStepAgainstFence();
+    chosenCell = bestStepForCat(board).cell;
   } else {
     // This catcher fights up close: think a few moves ahead.
     chosenCell = GameSearch(board, THINKING_TIME_MS).bestStep();

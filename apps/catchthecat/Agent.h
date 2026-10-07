@@ -97,6 +97,7 @@ protected:
     int guaranteedSteps = NOT_REACHABLE;
     int shortestSteps = NOT_REACHABLE;
     int openNeighborCount = 0;
+    int distanceFromFence = 0;  // how far this cell is from the nearest walled edge cell
 
     // Compares the rules in order of importance; the first difference decides.
     bool isBetterThan(const SpotRating& other) const;
@@ -109,6 +110,7 @@ protected:
   };
 
   // The best step for the cat by the simple rules in SpotRating, with no lookahead.
+  // Used against fence builders, where running straight for the exit works best.
   static CatStep bestStepForCat(const SearchBoard& board);
 
   // The search engine both agents use: plays the next few moves out in its head
@@ -121,10 +123,6 @@ protected:
 
     // For the cat: the best step found before time ran out, or OFF_BOARD if the cat can't move.
     int bestStep();
-
-    // For the cat, against a catcher that only walls edge cells (a "fence builder"):
-    // the search imagines only edge walls, so it can plan the race to the edge.
-    int bestStepAgainstFence();
 
     // For the catcher: the best wall found before time ran out.
     int bestWall();
@@ -142,7 +140,6 @@ protected:
     static constexpr int MAX_DEPTH = 12;
     static constexpr int NEARBY_EXIT_WEIGHT = 50;   // For closing exits ahead of the cat instead of chasing it.
     static constexpr int EXIT_LOOKAHEAD_STEPS = 2;
-    static constexpr int FENCE_EXTRA_STEPS = 2;  // against a fencer: imagine edge walls up to this many steps past the nearest exit
     static constexpr int LADDER_CHECK_RANGE = 2;  // when planning for the catcher: read ladders once the cat is this close to the edge
     static constexpr int LADDER_MAX_STEPS = 12;   // how far the ladder reader follows a run along the edge
 
@@ -161,7 +158,6 @@ protected:
     bool timeRanOut = false;
     bool firstPassDone = false;  // the shallowest search always finishes, so there's always a real answer
     bool planningForCatcher = false;  // set by bestWall(): lets the search imagine walls along escape routes
-    bool catcherOnlyFencesEdge = false;  // set by bestStepAgainstFence(): imagined walls are edge cells only
   };
 };
 

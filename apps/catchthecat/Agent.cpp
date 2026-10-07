@@ -8,6 +8,15 @@
 
 using namespace std;
 
+// Grid distance between two cells on this hex layout
+static int hexDistance(Point2D first, Point2D second) {
+  auto cubeX = [](Point2D point) { return point.x - (point.y - (point.y & 1)) / 2; };
+  int deltaX = cubeX(first) - cubeX(second);
+  int deltaZ = first.y - second.y;
+  int deltaY = -deltaX - deltaZ;
+  return max(abs(deltaX), max(abs(deltaY), abs(deltaZ)));
+}
+
 // SearchBoard
 
 Agent::SearchBoard::SearchBoard(const CatWorld& world)
@@ -82,12 +91,18 @@ bool Agent::SpotRating::isBetterThan(const SpotRating& other) const {
   if (!canReachEdge) return room > other.room;  // sealed in: more room means surviving longer
   if (guaranteedSteps != other.guaranteedSteps) return guaranteedSteps < other.guaranteedSteps;
   if (shortestSteps != other.shortestSteps) return shortestSteps < other.shortestSteps;
+  // Against a fence builder, the fence grows where its walls already are, so head away from them.
+  if (distanceFromFence != other.distanceFromFence) return distanceFromFence > other.distanceFromFence;
   return openNeighborCount > other.openNeighborCount;
 }
 
 Agent::CatStep Agent::bestStepForCat(const SearchBoard& board) {
   vector<int> guaranteed = board.guaranteedEscapeSteps();
   vector<int> shortest = board.shortestEscapeSteps();
+  vector<int> wallsOnEdge;
+  for (int cell = 0; cell < board.cellCount(); cell++)
+    if (board.isEdge(cell) && !board.isOpen(cell)) wallsOnEdge.push_back(cell);
+
   CatStep best;
   for (int cell : board.openNeighborsOf(board.catCell())) {
     SpotRating rating;
@@ -97,6 +112,9 @@ Agent::CatStep Agent::bestStepForCat(const SearchBoard& board) {
     rating.guaranteedSteps = guaranteed[cell];
     rating.openNeighborCount = (int)board.openNeighborsOf(cell).size();
     if (!rating.canReachEdge) rating.room = board.roomAround(cell);
+    rating.distanceFromFence = NOT_REACHABLE;
+    for (int wall : wallsOnEdge)
+      rating.distanceFromFence = min(rating.distanceFromFence, hexDistance(board.toPoint(cell), board.toPoint(wall)));
 
     bool isFirstOption = !best.canMove;
     if (isFirstOption || rating.isBetterThan(best.rating)) {
@@ -157,11 +175,6 @@ int Agent::GameSearch::bestStep() {
     if (resultIsDecided) break;  // searching deeper can't change a forced escape or a forced capture
   }
   return bestSoFar;
-}
-
-int Agent::GameSearch::bestStepAgainstFence() {
-  catcherOnlyFencesEdge = true;
-  return bestStep();
 }
 
 int Agent::GameSearch::bestWall() {
@@ -316,21 +329,13 @@ vector<int> Agent::GameSearch::catStepsBestFirst() const {
 // The catcher walls that the search imagined during its look-ahead
 vector<int> Agent::GameSearch::catcherWallChoices() const {
   int cat = board.catCell();
-  int scanSteps = catcherOnlyFencesEdge ? NOT_REACHABLE : max(IMAGINED_WALL_RADIUS, ESCAPE_ROUTE_RADIUS);
-  vector<int> stepsFromCat = board.stepsFrom({cat}, 1, scanSteps);
+  // Only cells a few steps from the cat can be chosen, so the scan can stop there.
+  vector<int> stepsFromCat = board.stepsFrom({cat}, 1, max(IMAGINED_WALL_RADIUS, ESCAPE_ROUTE_RADIUS));
   vector<int> shortest = board.shortestEscapeSteps();
   bool sealedIn = shortest[cat] == NOT_REACHABLE;
   if (sealedIn) return board.openNeighborsOf(cat);
 
   vector<int> choices;
-  if (catcherOnlyFencesEdge) {
-    // A fence builder only walls edge cells, and only the ones the cat could reach soon matter.
-    for (int cell = 0; cell < board.cellCount(); cell++)
-      if (board.isEdge(cell) && board.isOpen(cell) && stepsFromCat[cell] <= shortest[cat] + 1 + FENCE_EXTRA_STEPS)
-        choices.push_back(cell);
-    stable_sort(choices.begin(), choices.end(), [&](int first, int second) { return stepsFromCat[first] < stepsFromCat[second]; });
-    return choices;
-  }
   for (int cell = 0; cell < board.cellCount(); cell++) {
     if (cell == cat || !board.isOpen(cell)) continue;
     bool nearCat = stepsFromCat[cell] <= IMAGINED_WALL_RADIUS;
