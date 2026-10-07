@@ -108,6 +108,7 @@ Agent::GameSearch::GameSearch(const SearchBoard& startingBoard, int thinkingTime
     : board(startingBoard), deadline(chrono::steady_clock::now() + chrono::milliseconds(thinkingTimeMs)) {}
 
 bool Agent::GameSearch::outOfTime() {
+  if (!firstPassDone) return false;  // never cut off the first (shallowest) pass
   if (!timeRanOut && chrono::steady_clock::now() > deadline) timeRanOut = true;
   return timeRanOut;
 }
@@ -142,11 +143,17 @@ int Agent::GameSearch::bestStep() {
     }
     if (outOfTime()) break;  // this depth didn't finish, so don't trust its answer
     bestSoFar = bestThisDepth;
+    firstPassDone = true;
 
     bool resultIsDecided = bestScoreThisDepth >= ESCAPED - 100 || bestScoreThisDepth <= TRAPPED + 100;
     if (resultIsDecided) break;  // searching deeper can't change a forced escape or a forced capture
   }
   return bestSoFar;
+}
+
+int Agent::GameSearch::bestStepAgainstFence() {
+  catcherOnlyFencesEdge = true;
+  return bestStep();
 }
 
 int Agent::GameSearch::bestWall() {
@@ -180,6 +187,7 @@ int Agent::GameSearch::bestWall() {
     }
     if (outOfTime()) break;  // this depth didn't finish, so don't trust its answer
     bestSoFar = bestThisDepth;
+    firstPassDone = true;
 
     bool resultIsDecided = bestScoreThisDepth >= ESCAPED - 100 || bestScoreThisDepth <= TRAPPED + 100;
     if (resultIsDecided) break;  // a forced capture (or a lost cause) won't change with more depth
@@ -274,6 +282,14 @@ vector<int> Agent::GameSearch::catcherWallChoices() const {
   if (sealedIn) return board.openNeighborsOf(cat);
 
   vector<int> choices;
+  if (catcherOnlyFencesEdge) {
+    // A fence builder only walls edge cells, and only the ones the cat could reach soon matter.
+    for (int cell = 0; cell < board.cellCount(); cell++)
+      if (board.isEdge(cell) && board.isOpen(cell) && stepsFromCat[cell] <= shortest[cat] + 1 + FENCE_EXTRA_STEPS)
+        choices.push_back(cell);
+    stable_sort(choices.begin(), choices.end(), [&](int first, int second) { return stepsFromCat[first] < stepsFromCat[second]; });
+    return choices;
+  }
   for (int cell = 0; cell < board.cellCount(); cell++) {
     if (cell == cat || !board.isOpen(cell)) continue;
     bool nearCat = stepsFromCat[cell] <= IMAGINED_WALL_RADIUS;

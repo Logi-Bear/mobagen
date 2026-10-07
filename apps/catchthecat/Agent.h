@@ -113,6 +113,10 @@ protected:
     // For the cat: the best step found before time ran out, or OFF_BOARD if the cat can't move.
     int bestStep();
 
+    // For the cat, against a catcher that only walls edge cells (a "fence builder"):
+    // the search imagines only edge walls, so it can plan the race to the edge.
+    int bestStepAgainstFence();
+
     // For the catcher: the best wall found before time ran out.
     int bestWall();
 
@@ -121,7 +125,7 @@ protected:
     static const int ESCAPED = 1000000;    // minus moves played, so faster escapes score higher
     static const int TRAPPED = -1000000;   // plus moves played, so later captures score higher
     static const int SEALED_IN = -100000;  // plus pocket size, so bigger pockets score higher
-    static const int IMAGINED_WALL_RADIUS = 2;  // catcher walls considered within this many steps of the cat
+    static const int IMAGINED_WALL_RADIUS = 2;  // inside the search: catcher walls considered within this many steps of the cat
     static const int FIRST_WALL_RADIUS = 5;     // the catcher's actual move: walls considered within this many steps
     static const int FIRST_WALL_RADIUS_SEALED = 3;
     static const int ESCAPE_ROUTE_RADIUS = 5;   // when planning for the catcher: also imagine walls on the cat's
@@ -129,6 +133,7 @@ protected:
     static const int MAX_DEPTH = 12;
     static const int NEARBY_EXIT_WEIGHT = 50;   // For closing exits ahead of the cat instead of chasing it.
     static const int EXIT_LOOKAHEAD_STEPS = 2;
+    static const int FENCE_EXTRA_STEPS = 2;  // against a fencer: imagine edge walls up to this many steps past the nearest exit
 
     int searchCatTurn(int depthLeft, int alpha, int beta, int movesPlayed);
     int searchCatcherTurn(int depthLeft, int alpha, int beta, int movesPlayed);
@@ -142,7 +147,9 @@ protected:
     SearchBoard board;
     std::chrono::steady_clock::time_point deadline;
     bool timeRanOut = false;
+    bool firstPassDone = false;  // the shallowest search always finishes, so there's always a real answer
     bool planningForCatcher = false;  // set by bestWall(): lets the search imagine walls along escape routes
+    bool catcherOnlyFencesEdge = false;  // set by bestStepAgainstFence(): imagined walls are edge cells only
   };
 };
 
