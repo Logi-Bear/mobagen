@@ -235,8 +235,34 @@ int Agent::GameSearch::searchCatcherTurn(int depthLeft, int alpha, int beta, int
   return worst;
 }
 
+// Reads a "ladder" (a Go term): the cat steps next to exactly one open edge cell, so the
+// catcher MUST block that cell or lose; then the cat steps on to the next such cell, and so
+// on. Every catcher reply is forced, so this follows the whole run cheaply. Returns true if
+// the run ends with the cat touching two open edge cells (or an edge cell): an escape.
+bool Agent::GameSearch::catWinsLadder(int stepsLeft) {
+  if (stepsLeft == 0) return false;
+  int cat = board.catCell();
+  for (int step : board.openNeighborsOf(cat)) {
+    if (board.isEdge(step)) return true;
+    vector<int> openEdgesAround;
+    for (int neighbor : board.neighborsOf(step))
+      if (board.isOpen(neighbor) && board.isEdge(neighbor)) openEdgesAround.push_back(neighbor);
+    if (openEdgesAround.size() >= 2) return true;  // two exits at once: the catcher can only block one
+    if (openEdgesAround.size() == 1) {
+      int forcedWall = openEdgesAround[0];
+      board.moveCatTo(step);
+      board.placeWall(forcedWall);
+      bool escapes = catWinsLadder(stepsLeft - 1);
+      board.removeWall(forcedWall);
+      board.moveCatTo(cat);
+      if (escapes) return true;
+    }
+  }
+  return false;
+}
+
 // Judges a position where the search stops. Higher is better for the cat.
-int Agent::GameSearch::scorePosition() const {
+int Agent::GameSearch::scorePosition() {
   vector<int> guaranteed = board.guaranteedEscapeSteps();
   vector<int> shortest = board.shortestEscapeSteps();
   int bestGuaranteed = NOT_REACHABLE;
@@ -246,6 +272,11 @@ int Agent::GameSearch::scorePosition() const {
     bestShortest = min(bestShortest, shortest[step]);
   }
   if (bestShortest == NOT_REACHABLE) return SEALED_IN + board.roomAround(board.catCell());
+
+  // The catcher reads ladders: a run along the edge that ends in an escape counts as one now,
+  // even though it's too long for the normal search to see.
+  bool closeToEdge = bestShortest <= LADDER_CHECK_RANGE;
+  if (planningForCatcher && closeToEdge && catWinsLadder(LADDER_MAX_STEPS)) return ESCAPED - 1000;
 
   // Guaranteed steps matter most, so they get 100x the weight of the plain distance.
   int score = -100 * min(bestGuaranteed, 50) - bestShortest;

@@ -134,10 +134,14 @@ protected:
     static const int NEARBY_EXIT_WEIGHT = 50;   // For closing exits ahead of the cat instead of chasing it.
     static const int EXIT_LOOKAHEAD_STEPS = 2;
     static const int FENCE_EXTRA_STEPS = 2;  // against a fencer: imagine edge walls up to this many steps past the nearest exit
+    static const int LADDER_CHECK_RANGE = 2;  // when planning for the catcher: read ladders once the cat is this close to the edge
+    static const int LADDER_MAX_STEPS = 12;   // how far the ladder reader follows a run along the edge
+                                              // against a fencer: imagine edge walls up to this many steps past the nearest exit
 
     int searchCatTurn(int depthLeft, int alpha, int beta, int movesPlayed);
     int searchCatcherTurn(int depthLeft, int alpha, int beta, int movesPlayed);
-    int scorePosition() const;
+    int scorePosition();
+    bool catWinsLadder(int stepsLeft);
     int countNearbyExits(int stepsAllowed) const;
     std::vector<int> catStepsBestFirst() const;
     std::vector<int> catcherWallChoices() const;
