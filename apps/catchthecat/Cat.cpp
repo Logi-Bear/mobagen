@@ -59,7 +59,7 @@ Point2D Cat::Move(CatWorld* world) {
     chosenCell = bestStepForCat(board).cell;
   } else {
     // This catcher fights up close: think a few moves ahead.
-    chosenCell = CatSearch(board, THINKING_TIME_MS).bestStep();
+    chosenCell = GameSearch(board, THINKING_TIME_MS).bestStep();
   }
 
   Point2D wanted = chosenCell == OFF_BOARD ? world->getCat() : board.toPoint(chosenCell);

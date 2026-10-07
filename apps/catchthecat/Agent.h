@@ -37,7 +37,6 @@ protected:
   static const int OFF_BOARD = -1;
 
   // A fast, editable copy of the board for imagining future moves.
-  // A cell is just an int, and each cell's six neighbors are looked up once.
   class SearchBoard {
   public:
     explicit SearchBoard(const CatWorld& world);
@@ -103,14 +102,19 @@ protected:
   // The best step for the cat by the simple rules in SpotRating, with no lookahead.
   static CatStep bestStepForCat(const SearchBoard& board);
 
-  // The cat's search engine: plays the next few moves out in its head
-  // (minimax with alpha-beta pruning) and picks the step that holds up best.
-  class CatSearch {
+  // The search engine both agents use: plays the next few moves out in its head
+  // (minimax with alpha-beta pruning) and picks the move that holds up best.
+  // Scores are always from the cat's point of view, so the cat looks for the
+  // highest score and the catcher for the lowest.
+  class GameSearch {
   public:
-    CatSearch(const SearchBoard& startingBoard, int thinkingTimeMs);
+    GameSearch(const SearchBoard& startingBoard, int thinkingTimeMs);
 
-    // The best step found before time ran out, or OFF_BOARD if the cat can't move.
+    // For the cat: the best step found before time ran out, or OFF_BOARD if the cat can't move.
     int bestStep();
+
+    // For the catcher: the best wall found before time ran out.
+    int bestWall();
 
   private:
     // Scores are from the cat's point of view: higher is better for the cat.
@@ -118,18 +122,27 @@ protected:
     static const int TRAPPED = -1000000;   // plus moves played, so later captures score higher
     static const int SEALED_IN = -100000;  // plus pocket size, so bigger pockets score higher
     static const int IMAGINED_WALL_RADIUS = 2;  // catcher walls considered within this many steps of the cat
+    static const int FIRST_WALL_RADIUS = 5;     // the catcher's actual move: walls considered within this many steps
+    static const int FIRST_WALL_RADIUS_SEALED = 3;
+    static const int ESCAPE_ROUTE_RADIUS = 5;   // when planning for the catcher: also imagine walls on the cat's
+                                                // escape routes up to this many steps away (stops edge-runners)
     static const int MAX_DEPTH = 12;
+    static const int NEARBY_EXIT_WEIGHT = 50;   // For closing exits ahead of the cat instead of chasing it.
+    static const int EXIT_LOOKAHEAD_STEPS = 2;
 
     int searchCatTurn(int depthLeft, int alpha, int beta, int movesPlayed);
     int searchCatcherTurn(int depthLeft, int alpha, int beta, int movesPlayed);
     int scorePosition() const;
+    int countNearbyExits(int stepsAllowed) const;
     std::vector<int> catStepsBestFirst() const;
     std::vector<int> catcherWallChoices() const;
+    std::vector<int> firstWallChoices() const;
     bool outOfTime();
 
     SearchBoard board;
     std::chrono::steady_clock::time_point deadline;
     bool timeRanOut = false;
+    bool planningForCatcher = false;  // set by bestWall(): lets the search imagine walls along escape routes
   };
 };
 

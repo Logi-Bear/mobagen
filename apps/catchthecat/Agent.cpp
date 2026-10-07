@@ -90,24 +90,29 @@ Agent::CatStep Agent::bestStepForCat(const SearchBoard& board) {
     rating.openNeighborCount = (int)board.openNeighborsOf(cell).size();
     if (!rating.canReachEdge) rating.room = board.roomAround(cell);
 
-    if (!best.canMove || rating.isBetterThan(best.rating)) best = {true, cell, rating};
+    bool isFirstOption = !best.canMove;
+    if (isFirstOption || rating.isBetterThan(best.rating)) {
+      best.canMove = true;
+      best.cell = cell;
+      best.rating = rating;
+    }
   }
   return best;
 }
 
 
 
-// CatSearch: minimax with alpha-beta pruning and iterative deepening
+// GameSearch: minimax with alpha-beta pruning and iterative deepening
 
-Agent::CatSearch::CatSearch(const SearchBoard& startingBoard, int thinkingTimeMs)
+Agent::GameSearch::GameSearch(const SearchBoard& startingBoard, int thinkingTimeMs)
     : board(startingBoard), deadline(chrono::steady_clock::now() + chrono::milliseconds(thinkingTimeMs)) {}
 
-bool Agent::CatSearch::outOfTime() {
+bool Agent::GameSearch::outOfTime() {
   if (!timeRanOut && chrono::steady_clock::now() > deadline) timeRanOut = true;
   return timeRanOut;
 }
 
-int Agent::CatSearch::bestStep() {
+int Agent::GameSearch::bestStep() {
   int cat = board.catCell();
   vector<int> steps = board.openNeighborsOf(cat);
   if (steps.empty()) return OFF_BOARD;
@@ -144,8 +149,46 @@ int Agent::CatSearch::bestStep() {
   return bestSoFar;
 }
 
+int Agent::GameSearch::bestWall() {
+  planningForCatcher = true;
+  vector<int> walls = firstWallChoices();
+  if (walls.empty()) {  // nothing near the cat
+    for (int cell = 0; cell < board.cellCount(); cell++)
+      if (cell != board.catCell() && board.isOpen(cell)) return cell;
+    return OFF_BOARD;
+  }
+
+  // Iterative deepening, 1 move ahead (just this wall), then 3, 5, etc...
+  int bestSoFar = walls[0];
+  for (int depth = 1; depth <= MAX_DEPTH; depth += 2) {
+    // Try the previous best wall first: alpha-beta prunes far more when good moves come early.
+    stable_partition(walls.begin(), walls.end(), [&](int wall) { return wall == bestSoFar; });
+
+    int bestThisDepth = OFF_BOARD;
+    int bestScoreThisDepth = ESCAPED + 2;  // the catcher wants this as LOW as possible
+    int beta = ESCAPED + 1;                // the score the catcher is already guaranteed by an earlier wall
+    for (int wall : walls) {
+      board.placeWall(wall);
+      int score = searchCatTurn(depth - 1, TRAPPED - 1, beta, 1);
+      board.removeWall(wall);
+      if (outOfTime()) break;
+      if (score < bestScoreThisDepth) {
+        bestScoreThisDepth = score;
+        bestThisDepth = wall;
+      }
+      beta = min(beta, score);
+    }
+    if (outOfTime()) break;  // this depth didn't finish, so don't trust its answer
+    bestSoFar = bestThisDepth;
+
+    bool resultIsDecided = bestScoreThisDepth >= ESCAPED - 100 || bestScoreThisDepth <= TRAPPED + 100;
+    if (resultIsDecided) break;  // a forced capture (or a lost cause) won't change with more depth
+  }
+  return bestSoFar;
+}
+
 // The cat is about to move. Returns the best score the cat can get from here.
-int Agent::CatSearch::searchCatTurn(int depthLeft, int alpha, int beta, int movesPlayed) {
+int Agent::GameSearch::searchCatTurn(int depthLeft, int alpha, int beta, int movesPlayed) {
   if (outOfTime()) return 0;  // the caller throws away results once time is up
   int cat = board.catCell();
   if (board.isEdge(cat)) return ESCAPED - movesPlayed;
@@ -165,7 +208,7 @@ int Agent::CatSearch::searchCatTurn(int depthLeft, int alpha, int beta, int move
 }
 
 // The catcher is about to place a wall. Returns the worst score it can hold the cat to.
-int Agent::CatSearch::searchCatcherTurn(int depthLeft, int alpha, int beta, int movesPlayed) {
+int Agent::GameSearch::searchCatcherTurn(int depthLeft, int alpha, int beta, int movesPlayed) {
   if (outOfTime()) return 0;
   if (board.isEdge(board.catCell())) return ESCAPED - movesPlayed;
   if (depthLeft == 0) return scorePosition();
@@ -185,7 +228,7 @@ int Agent::CatSearch::searchCatcherTurn(int depthLeft, int alpha, int beta, int 
 }
 
 // Judges a position where the search stops. Higher is better for the cat.
-int Agent::CatSearch::scorePosition() const {
+int Agent::GameSearch::scorePosition() const {
   vector<int> guaranteed = board.guaranteedEscapeSteps();
   vector<int> shortest = board.shortestEscapeSteps();
   int bestGuaranteed = NOT_REACHABLE;
@@ -197,28 +240,64 @@ int Agent::CatSearch::scorePosition() const {
   if (bestShortest == NOT_REACHABLE) return SEALED_IN + board.roomAround(board.catCell());
 
   // Guaranteed steps matter most, so they get 100x the weight of the plain distance.
-  return -100 * min(bestGuaranteed, 50) - bestShortest;
+  int score = -100 * min(bestGuaranteed, 50) - bestShortest;
+
+  // The catcher also counts the exits the cat could reach soon: walling off exits ahead
+  // of the cat stops runners, while walls right next to it only slow them down.
+  if (planningForCatcher) score += NEARBY_EXIT_WEIGHT * countNearbyExits(bestShortest + 1 + EXIT_LOOKAHEAD_STEPS);
+  return score;
+}
+
+// How many open edge cells the cat can reach within `stepsAllowed` steps.
+int Agent::GameSearch::countNearbyExits(int stepsAllowed) const {
+  vector<int> stepsFromCat = board.stepsFrom({board.catCell()}, 1);
+  int exits = 0;
+  for (int cell = 0; cell < board.cellCount(); cell++)
+    if (board.isEdge(cell) && stepsFromCat[cell] <= stepsAllowed) exits++;
+  return exits;
 }
 
 // The cat's possible steps, closest to the edge first (good moves first = more pruning).
-vector<int> Agent::CatSearch::catStepsBestFirst() const {
+vector<int> Agent::GameSearch::catStepsBestFirst() const {
   vector<int> steps = board.openNeighborsOf(board.catCell());
   vector<int> shortest = board.shortestEscapeSteps();
   stable_sort(steps.begin(), steps.end(), [&](int first, int second) { return shortest[first] < shortest[second]; });
   return steps;
 }
 
-// The walls the cat imagines the catcher might place: open cells near the cat,
-// closest first. If the cat is already sealed in, only walls right next to it.
-vector<int> Agent::CatSearch::catcherWallChoices() const {
+// The catcher walls that the search imagined during its look-ahead
+vector<int> Agent::GameSearch::catcherWallChoices() const {
   int cat = board.catCell();
   vector<int> stepsFromCat = board.stepsFrom({cat}, 1);
-  bool sealedIn = board.shortestEscapeSteps()[cat] == NOT_REACHABLE;
+  vector<int> shortest = board.shortestEscapeSteps();
+  bool sealedIn = shortest[cat] == NOT_REACHABLE;
   if (sealedIn) return board.openNeighborsOf(cat);
 
   vector<int> choices;
+  for (int cell = 0; cell < board.cellCount(); cell++) {
+    if (cell == cat || !board.isOpen(cell)) continue;
+    bool nearCat = stepsFromCat[cell] <= IMAGINED_WALL_RADIUS;
+    // A cell is on a shortest escape route when (steps from the cat to it) + (steps from it
+    // to the edge) is no more than the cat's shortest escape, plus 1 for nearly-shortest routes.
+    bool onEscapeRoute = planningForCatcher && stepsFromCat[cell] <= ESCAPE_ROUTE_RADIUS &&
+                         stepsFromCat[cell] + shortest[cell] <= shortest[cat] + 1;
+    if (nearCat || onEscapeRoute) choices.push_back(cell);
+  }
+  stable_sort(choices.begin(), choices.end(), [&](int first, int second) { return stepsFromCat[first] < stepsFromCat[second]; });
+  return choices;
+}
+
+// The walls the catcher actually considers for its real move: open cells near the cat,
+// closest first. A wider ring than inside the search, since this choice really happens.
+vector<int> Agent::GameSearch::firstWallChoices() const {
+  int cat = board.catCell();
+  vector<int> stepsFromCat = board.stepsFrom({cat}, 1);
+  bool sealedIn = board.shortestEscapeSteps()[cat] == NOT_REACHABLE;
+  int radius = sealedIn ? FIRST_WALL_RADIUS_SEALED : FIRST_WALL_RADIUS;
+
+  vector<int> choices;
   for (int cell = 0; cell < board.cellCount(); cell++)
-    if (cell != cat && board.isOpen(cell) && stepsFromCat[cell] <= IMAGINED_WALL_RADIUS) choices.push_back(cell);
+    if (cell != cat && board.isOpen(cell) && stepsFromCat[cell] <= radius) choices.push_back(cell);
   stable_sort(choices.begin(), choices.end(), [&](int first, int second) { return stepsFromCat[first] < stepsFromCat[second]; });
   return choices;
 }
