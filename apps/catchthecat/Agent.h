@@ -155,18 +155,25 @@ protected:
     static constexpr int ESCAPE_ROUTE_RADIUS = 5;   // when planning for the catcher: also imagine walls on the cat's
                                                     // escape routes up to this many steps away (stops edge-runners)
     static constexpr int MAX_DEPTH = 12;
-    static constexpr int NEARBY_EXIT_WEIGHT = 100;   // For closing exits ahead of the cat instead of chasing it.
+    static constexpr int NEARBY_EXIT_WEIGHT = 50;   // For closing exits ahead of the cat instead of chasing it.
     static constexpr int EXIT_LOOKAHEAD_STEPS = 2;
     static constexpr int FAR_EXIT_WEIGHT = 5;
-    static constexpr int FAR_EXIT_LOOKAHEAD_STEPS = 12;
+    static constexpr int FAR_EXIT_LOOKAHEAD_STEPS = 5;
     static constexpr int LADDER_CHECK_RANGE = 2;  // when planning for the catcher: read ladders once the cat is this close to the edge
     static constexpr int LADDER_MAX_STEPS = 12;   // how far the ladder reader follows a run along the edge
     static constexpr int CONTAINMENT_WEIGHT = 100;
     static constexpr int CONTAINMENT_RADIUS = 3;
+    // The catcher's final safety check: before committing to a wall, make sure the cat
+    // can't FORCE an escape within this many of its moves. In the tournament's slower
+    // builds the search sees less deeply, and this exact check catches what it misses.
+    static constexpr int SAFETY_CHECK_MOVES = 3;
+    static constexpr int SAFETY_CHECK_WALLS = 12;  // how many of the search's best walls to try
 
     int searchCatTurn(int depthLeft, int alpha, int beta, int movesPlayed);
     int searchCatcherTurn(int depthLeft, int alpha, int beta, int movesPlayed);
     int scorePosition();
+    bool catCanForceEscape(int catMovesLeft);
+    bool catcherCannotStopEscape(int catMovesLeft);
     bool catWinsLadder(int stepsLeft);
     int countNearbyExits(int stepsAllowed) const;
     int countOpenCellsNearCat(int radius) const;

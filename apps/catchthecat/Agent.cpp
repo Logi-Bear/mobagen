@@ -316,6 +316,7 @@ int Agent::GameSearch::bestWall() {
 
   // Iterative deepening, 1 move ahead (just this wall), then 3, 5, etc...
   int bestSoFar = walls[0];
+  vector<pair<int, int>> ranking;  // (score, wall) from the deepest pass that finished, in search order
   for (int depth = 1; depth <= MAX_DEPTH; depth += 2) {
     // Try the previous best wall first: alpha-beta prunes far more when good moves come early.
     stable_partition(walls.begin(), walls.end(), [&](int wall) { return wall == bestSoFar; });
@@ -323,11 +324,13 @@ int Agent::GameSearch::bestWall() {
     int bestThisDepth = OFF_BOARD;
     int bestScoreThisDepth = ESCAPED + 2;  // the catcher wants this as LOW as possible
     int beta = ESCAPED + 1;                // the score the catcher is already guaranteed by an earlier wall
+    vector<pair<int, int>> rankingThisDepth;
     for (int wall : walls) {
       board.placeWall(wall);
       int score = searchCatTurn(depth - 1, TRAPPED - 1, beta, 1);
       board.removeWall(wall);
       if (outOfTime()) break;
+      rankingThisDepth.push_back({score, wall});
       if (score < bestScoreThisDepth) {
         bestScoreThisDepth = score;
         bestThisDepth = wall;
@@ -336,12 +339,64 @@ int Agent::GameSearch::bestWall() {
     }
     if (outOfTime()) break;  // this depth didn't finish, so don't trust its answer
     bestSoFar = bestThisDepth;
+    ranking = rankingThisDepth;
     firstPassDone = true;
 
     bool resultIsDecided = bestScoreThisDepth >= ESCAPED - 100 || bestScoreThisDepth <= TRAPPED + 100;
     if (resultIsDecided) break;  // a forced capture (or a lost cause) won't change with more depth
   }
-  return bestSoFar;
+
+  // Final safety check: try the search's walls best first (equal scores keep the search's
+  // own order, so its choice is always tried first) and play the first one that leaves the
+  // cat no forced escape within SAFETY_CHECK_MOVES moves.
+  stable_sort(ranking.begin(), ranking.end(), [](const pair<int, int>& first, const pair<int, int>& second) { return first.first < second.first; });
+  int checked = 0;
+  for (auto [score, wall] : ranking) {
+    if (checked++ >= SAFETY_CHECK_WALLS) break;
+    board.placeWall(wall);
+    bool catCanEscape = catCanForceEscape(SAFETY_CHECK_MOVES);
+    board.removeWall(wall);
+    if (!catCanEscape) return wall;
+  }
+  return bestSoFar;  // every checked wall loses anyway: trust the search
+}
+
+// Exact check, cat to move: can the cat reach the edge within `catMovesLeft` of its own
+// moves no matter which walls the catcher places? Only walls on short enough escape
+// routes are tried, since no other wall can stop an escape that fast.
+bool Agent::GameSearch::catCanForceEscape(int catMovesLeft) {
+  if (catMovesLeft <= 0) return false;
+  int cat = board.catCell();
+  vector<int> steps = board.openNeighborsOf(cat);
+  for (int step : steps)
+    if (board.isEdge(step)) return true;
+  if (catMovesLeft == 1) return false;
+
+  vector<int> toEdge = board.shortestEscapeSteps();
+  for (int step : steps) {
+    if (toEdge[step] > catMovesLeft - 1) continue;  // too far to escape in time from there
+    board.moveCatTo(step);
+    bool escapes = catcherCannotStopEscape(catMovesLeft - 1);
+    board.moveCatTo(cat);
+    if (escapes) return true;
+  }
+  return false;
+}
+
+// Exact check, catcher to move: does EVERY wall still leave the cat a forced escape?
+bool Agent::GameSearch::catcherCannotStopEscape(int catMovesLeft) {
+  int cat = board.catCell();
+  vector<int> fromCat = board.stepsFrom({cat}, 1, catMovesLeft);
+  vector<int> toEdge = board.shortestEscapeSteps();
+  for (int cell = 0; cell < board.cellCount(); cell++) {
+    bool onShortEnoughRoute = fromCat[cell] != NOT_REACHABLE && fromCat[cell] + toEdge[cell] <= catMovesLeft;
+    if (cell == cat || !board.isOpen(cell) || !onShortEnoughRoute) continue;
+    board.placeWall(cell);
+    bool stillEscapes = catCanForceEscape(catMovesLeft);
+    board.removeWall(cell);
+    if (!stillEscapes) return false;  // this wall stops it
+  }
+  return true;
 }
 
 // The cat is about to move. Returns the best score the cat can get from here.
