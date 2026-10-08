@@ -1,6 +1,7 @@
 #include "Agent.h"
 #include <algorithm>
 #include <climits>
+#include <cstring>
 #include <queue>
 #include <unordered_map>
 #include <unordered_set>
@@ -31,9 +32,14 @@ Agent::SearchBoard::SearchBoard(const CatWorld& world)
     edgeCells[cell] = world.catWinsOnSpace(point);
     if (edgeCells[cell]) edgeCellList.push_back(cell);
     vector<Point2D> around = CatWorld::neighbors(point);  // same neighbor order as the game uses
-    for (int direction = 0; direction < 6; direction++)
+    for (int direction = 0; direction < 6; direction++) {
       neighborTable[cell][direction] = world.isValidPosition(around[direction]) ? toCell(around[direction]) : OFF_BOARD;
+      flatNeighbors.push_back(neighborTable[cell][direction]);
+    }
   }
+  scratchTimesReached.resize(cellCount());
+  scratchFrontier.resize(cellCount());
+  scratchSteps.resize(cellCount());
 }
 
 bool Agent::SearchBoard::hasOpenNeighbor(int cell) const {
@@ -50,23 +56,84 @@ vector<int> Agent::SearchBoard::openNeighborsOf(int cell) const {
 }
 
 vector<int> Agent::SearchBoard::stepsFrom(const vector<int>& startCells, int neighborsNeeded, int maxSteps) const {
-  vector<int> steps(cellCount(), NOT_REACHABLE);
-  scratchTimesReached.assign(cellCount(), 0);
-  scratchFrontier.assign(startCells.begin(), startCells.end());  // used as a queue we read it front to back while appending
-  for (int start : startCells) steps[start] = 0;
+  // This scan runs millions of times per move, so it works directly on plain arrays.
+  // In an unoptimized build (which the tournament uses), every std::vector [] or small
+  // helper like isOpen() is a real function call, and avoiding them in this one loop
+  // makes the whole search several times faster. The visiting order is unchanged.
+  int cellTotal = cellCount();
+  vector<int> steps(cellTotal);
+  int* stepsTo = steps.data();
+  for (int cell = 0; cell < cellTotal; cell++) stepsTo[cell] = NOT_REACHABLE;
 
-  for (size_t next = 0; next < scratchFrontier.size(); next++) {
-    int current = scratchFrontier[next];
-    if (steps[current] >= maxSteps) continue;
-    for (int neighbor : neighborsOf(current)) {
-      if (!isOpen(neighbor) || steps[neighbor] != NOT_REACHABLE) continue;
-      scratchTimesReached[neighbor]++;
-      if (scratchTimesReached[neighbor] < neighborsNeeded) continue;
-      steps[neighbor] = steps[current] + 1;
-      scratchFrontier.push_back(neighbor);
+  int* timesReached = scratchTimesReached.data();
+  memset(timesReached, 0, cellTotal * sizeof(int));
+  int* frontier = scratchFrontier.data();  // used as a queue: read front to back while appending
+  int frontierEnd = 0;
+  const unsigned char* isWall = walls.data();
+  const int* neighbors = flatNeighbors.data();
+
+  for (int start : startCells) {
+    stepsTo[start] = 0;
+    frontier[frontierEnd++] = start;
+  }
+  for (int next = 0; next < frontierEnd; next++) {
+    int current = frontier[next];
+    if (stepsTo[current] >= maxSteps) continue;  // far enough: don't spread further from here
+    const int* around = neighbors + current * 6;
+    for (int direction = 0; direction < 6; direction++) {
+      int neighbor = around[direction];
+      if (neighbor == OFF_BOARD || isWall[neighbor] || stepsTo[neighbor] != NOT_REACHABLE) continue;
+      timesReached[neighbor]++;
+      if (timesReached[neighbor] < neighborsNeeded) continue;
+      stepsTo[neighbor] = stepsTo[current] + 1;
+      frontier[frontierEnd++] = neighbor;
     }
   }
   return steps;
+}
+
+int Agent::SearchBoard::fewestEscapeStepsAround(int cell, int neighborsNeeded) const {
+  // The scan spreads out from the edge in order of distance, so the first of the cell's
+  // neighbors it reaches has the fewest steps. Same plain-array style as stepsFrom().
+  const int* targets = flatNeighbors.data() + cell * 6;
+  int cellTotal = cellCount();
+  int* stepsTo = scratchSteps.data();
+  for (int index = 0; index < cellTotal; index++) stepsTo[index] = NOT_REACHABLE;
+  int* timesReached = scratchTimesReached.data();
+  memset(timesReached, 0, cellTotal * sizeof(int));
+  int* frontier = scratchFrontier.data();
+  int frontierEnd = 0;
+  const unsigned char* isWall = walls.data();
+  const int* neighbors = flatNeighbors.data();
+  auto isTarget = [&](int candidate) {
+    for (int direction = 0; direction < 6; direction++)
+      if (targets[direction] == candidate) return true;
+    return false;
+  };
+
+  const int* edges = edgeCellList.data();
+  int edgeTotal = (int)edgeCellList.size();
+  for (int index = 0; index < edgeTotal; index++) {
+    int edge = edges[index];
+    if (isWall[edge]) continue;
+    if (isTarget(edge)) return 0;  // an open edge cell right next to `cell`
+    stepsTo[edge] = 0;
+    frontier[frontierEnd++] = edge;
+  }
+  for (int next = 0; next < frontierEnd; next++) {
+    int current = frontier[next];
+    const int* around = neighbors + current * 6;
+    for (int direction = 0; direction < 6; direction++) {
+      int neighbor = around[direction];
+      if (neighbor == OFF_BOARD || isWall[neighbor] || stepsTo[neighbor] != NOT_REACHABLE) continue;
+      timesReached[neighbor]++;
+      if (timesReached[neighbor] < neighborsNeeded) continue;
+      stepsTo[neighbor] = stepsTo[current] + 1;
+      if (isTarget(neighbor)) return stepsTo[neighbor];
+      frontier[frontierEnd++] = neighbor;
+    }
+  }
+  return NOT_REACHABLE;  // none of the neighbors can reach the edge
 }
 
 vector<int> Agent::SearchBoard::openEdgeCells() const {
@@ -345,15 +412,8 @@ bool Agent::GameSearch::catWinsLadder(int stepsLeft) {
 
 // Judges a position where the search stops. Higher is better for the cat.
 int Agent::GameSearch::scorePosition() {
-  vector<int> guaranteed = board.guaranteedEscapeSteps();
-  vector<int> shortest = board.shortestEscapeSteps();
-  int bestGuaranteed = NOT_REACHABLE;
-  int bestShortest = NOT_REACHABLE;
-  for (int step : board.neighborsOf(board.catCell())) {
-    if (!board.isOpen(step)) continue;
-    bestGuaranteed = min(bestGuaranteed, guaranteed[step]);
-    bestShortest = min(bestShortest, shortest[step]);
-  }
+  int bestShortest = board.fewestEscapeStepsAround(board.catCell(), 1);
+  int bestGuaranteed = board.fewestEscapeStepsAround(board.catCell(), 2);
   if (bestShortest == NOT_REACHABLE) return SEALED_IN + board.roomAround(board.catCell());
 
   // The catcher reads ladders: a run along the edge that ends in an escape counts as one now,
@@ -381,18 +441,22 @@ int Agent::GameSearch::scorePosition() {
 // How many open cells the cat can reach within `radius` steps (including where it stands).
 int Agent::GameSearch::countOpenCellsNearCat(int radius) const {
   vector<int> stepsFromCat = board.stepsFrom({board.catCell()}, 1, radius);
-  int openCells = 0;
-  for (int steps : stepsFromCat)
-    if (steps <= radius) openCells++;
+  const int* steps = stepsFromCat.data();  // plain array: this runs at every scored position
+  int cellTotal = board.cellCount(), openCells = 0;
+  for (int cell = 0; cell < cellTotal; cell++)
+    if (steps[cell] <= radius) openCells++;
   return openCells;
 }
 
 // How many open edge cells the cat can reach within `stepsAllowed` steps.
 int Agent::GameSearch::countNearbyExits(int stepsAllowed) const {
   vector<int> stepsFromCat = board.stepsFrom({board.catCell()}, 1, stepsAllowed);
-  int exits = 0;
-  for (int cell = 0; cell < board.cellCount(); cell++)
-    if (board.isEdge(cell) && stepsFromCat[cell] <= stepsAllowed) exits++;
+  const int* steps = stepsFromCat.data();  // plain arrays: this runs at every scored position
+  const vector<int>& edgeCells = board.allEdgeCells();
+  const int* edges = edgeCells.data();
+  int edgeTotal = (int)edgeCells.size(), exits = 0;
+  for (int index = 0; index < edgeTotal; index++)
+    if (steps[edges[index]] <= stepsAllowed) exits++;
   return exits;
 }
 

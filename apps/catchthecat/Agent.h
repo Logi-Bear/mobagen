@@ -48,6 +48,7 @@ protected:
     bool hasOpenNeighbor(int cell) const;
     bool isEdge(int cell) const { return edgeCells[cell]; }
     const std::array<int, 6>& neighborsOf(int cell) const { return neighborTable[cell]; }
+    const std::vector<int>& allEdgeCells() const { return edgeCellList; }
     std::vector<int> openNeighborsOf(int cell) const;
 
     void placeWall(int cell) { walls[cell] = true; }
@@ -68,6 +69,8 @@ protected:
     // counts if TWO of its neighbors lead out.
     std::vector<int> guaranteedEscapeSteps() const { return stepsFrom(openEdgeCells(), 2); }
 
+    int fewestEscapeStepsAround(int cell, int neighborsNeeded) const;
+
     // How many open cells the cat could still reach from this cell.
     int roomAround(int cell) const;
 
@@ -84,10 +87,12 @@ protected:
     std::vector<unsigned char> edgeCells;
     std::vector<int> edgeCellList;                  // every edge cell, so we don't scan the whole board to find them
     std::vector<std::array<int, 6>> neighborTable;
+    std::vector<int> flatNeighbors;                 // the same table as one flat list (6 per cell), for the fast scan
 
     // Working memory for stepsFrom, reused between calls instead of reallocated every time.
     mutable std::vector<int> scratchTimesReached;
     mutable std::vector<int> scratchFrontier;
+    mutable std::vector<int> scratchSteps;
   };
 
   // Everything the cat cares about when deciding where to step.
