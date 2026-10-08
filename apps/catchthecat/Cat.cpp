@@ -5,7 +5,7 @@
 
 // How long the search may think per move. Testing showed no difference between 3ms and 40ms,
 // and every millisecond costs points through the tournament's time penalty.
-static const int THINKING_TIME_MS = 4;
+static const int THINKING_TIME_MS = 3;
 static const int FENCE_THINKING_TIME_MS = 10;  // for planning around a predictable fence builder
 
 // How many more walls than "random chance" the edge needs before we decide the
