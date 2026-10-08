@@ -326,39 +326,21 @@ bool Agent::GameSearch::catWinsLadder(int stepsLeft) {
   int cat = board.catCell();
   for (int step : board.openNeighborsOf(cat)) {
     if (board.isEdge(step)) return true;
-    int exitsAroundStep = countOpenEdgeNeighbors(step);
-    if (exitsAroundStep >= 2) return true;  // two exits at once: the catcher can only block one
-
-    int forcedWall = OFF_BOARD;
-    if (exitsAroundStep == 1) {
-      for (int neighbor : board.neighborsOf(step))
-        if (board.isOpen(neighbor) && board.isEdge(neighbor)) forcedWall = neighbor;
-    } else {
-      vector<int> doubleExits;
-      for (int neighbor : board.neighborsOf(step)) {
-        bool candidate = board.isOpen(neighbor) && !board.isEdge(neighbor) && neighbor != cat;
-        if (candidate && countOpenEdgeNeighbors(neighbor) >= 2) doubleExits.push_back(neighbor);
-      }
-      if (doubleExits.size() == 1) forcedWall = doubleExits[0];
+    vector<int> openEdgesAround;
+    for (int neighbor : board.neighborsOf(step))
+      if (board.isOpen(neighbor) && board.isEdge(neighbor)) openEdgesAround.push_back(neighbor);
+    if (openEdgesAround.size() >= 2) return true;  // two exits at once: the catcher can only block one
+    if (openEdgesAround.size() == 1) {
+      int forcedWall = openEdgesAround[0];
+      board.moveCatTo(step);
+      board.placeWall(forcedWall);
+      bool escapes = catWinsLadder(stepsLeft - 1);
+      board.removeWall(forcedWall);
+      board.moveCatTo(cat);
+      if (escapes) return true;
     }
-    if (forcedWall == OFF_BOARD) continue;  // this step doesn't force anything
-
-    board.moveCatTo(step);
-    board.placeWall(forcedWall);
-    bool escapes = catWinsLadder(stepsLeft - 1);
-    board.removeWall(forcedWall);
-    board.moveCatTo(cat);
-    if (escapes) return true;
   }
   return false;
-}
-
-// How many open edge cells touch this cell.
-int Agent::GameSearch::countOpenEdgeNeighbors(int cell) const {
-  int exits = 0;
-  for (int neighbor : board.neighborsOf(cell))
-    if (board.isOpen(neighbor) && board.isEdge(neighbor)) exits++;
-  return exits;
 }
 
 // Judges a position where the search stops. Higher is better for the cat.
