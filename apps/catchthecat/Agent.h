@@ -153,7 +153,7 @@ protected:
     static constexpr int NEARBY_EXIT_WEIGHT = 50;   // For closing exits ahead of the cat instead of chasing it.
     static constexpr int EXIT_LOOKAHEAD_STEPS = 2;
     static constexpr int LADDER_CHECK_RANGE = 2;  // when planning for the catcher: read ladders once the cat is this close to the edge
-    static constexpr int LADDER_MAX_STEPS = 8;   // how far the ladder reader follows a run along the edge
+    static constexpr int LADDER_MAX_STEPS = 12;   // how far the ladder reader follows a run along the edge
     static constexpr int CONTAINMENT_WEIGHT = 100;
     static constexpr int CONTAINMENT_RADIUS = 3;
 
