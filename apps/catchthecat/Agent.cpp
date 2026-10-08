@@ -366,10 +366,25 @@ int Agent::GameSearch::scorePosition() {
 
   // The catcher also counts the exits the cat could reach soon: walling off exits ahead
   // of the cat stops runners, while walls right next to it only slow them down.
-  if (planningForCatcher) score += NEARBY_EXIT_WEIGHT * countNearbyExits(bestShortest + 1 + EXIT_LOOKAHEAD_STEPS);
+  if (planningForCatcher) {
+    score += NEARBY_EXIT_WEIGHT * countNearbyExits(bestShortest + 1 + EXIT_LOOKAHEAD_STEPS);
+    score += FAR_EXIT_WEIGHT * countNearbyExits(bestShortest + 1 + FAR_EXIT_LOOKAHEAD_STEPS);
+  }
+
+  // Once the cat can't force an escape, the catcher's main job is done, so it closes in:
+  // fewer open cells around the cat means a tighter ring and a faster capture.
   bool catHasGuaranteedEscape = bestGuaranteed != NOT_REACHABLE;
   if (planningForCatcher && !catHasGuaranteedEscape) score += CONTAINMENT_WEIGHT * countOpenCellsNearCat(CONTAINMENT_RADIUS);
   return score;
+}
+
+// How many open cells the cat can reach within `radius` steps (including where it stands).
+int Agent::GameSearch::countOpenCellsNearCat(int radius) const {
+  vector<int> stepsFromCat = board.stepsFrom({board.catCell()}, 1, radius);
+  int openCells = 0;
+  for (int steps : stepsFromCat)
+    if (steps <= radius) openCells++;
+  return openCells;
 }
 
 // How many open edge cells the cat can reach within `stepsAllowed` steps.
@@ -379,14 +394,6 @@ int Agent::GameSearch::countNearbyExits(int stepsAllowed) const {
   for (int cell = 0; cell < board.cellCount(); cell++)
     if (board.isEdge(cell) && stepsFromCat[cell] <= stepsAllowed) exits++;
   return exits;
-}
-
-int Agent::GameSearch::countOpenCellsNearCat(int radius) const {
-  vector<int> stepsFromCat = board.stepsFrom({board.catCell()}, 1, radius);
-  int openCells = 0;
-  for (int steps : stepsFromCat)
-    if (steps <= radius) openCells++;
-  return openCells;
 }
 
 // The cat's possible steps, closest to the edge first (good moves first = more pruning).
