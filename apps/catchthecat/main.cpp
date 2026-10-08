@@ -330,7 +330,7 @@ struct CatchTheCatApp : app::AppCallbacks {
         newSize = (newSize / 4) * 4 + 1;
         if (newSize != catWorld.getWorldSideSize()) catWorld.setSizeAndReset(newSize);
       }
-      if (ImGui::SliderFloat("Turn Duration", &catWorld.timeBetweenAITicksRef(), 0.0f, 30.0f)
+      if (ImGui::SliderFloat("Turn Duration", &catWorld.timeBetweenAITicksRef(), 0.0f, 1.0f)
           && catWorld.getWorldSideSize() != (newSize / 2) * 2 + 1) {
         catWorld.setSizeAndReset((newSize / 2) * 2 + 1);
       }
