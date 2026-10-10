@@ -71,6 +71,11 @@ protected:
 
     int fewestEscapeStepsAround(int cell, int neighborsNeeded) const;
 
+    // One scan from `cell` that counts the open edge cells it can reach within `nearSteps`
+    // and within `farSteps` steps, plus the open cells within `roomSteps` steps.
+    struct NearbyCounts { int nearExits = 0, farExits = 0, openCells = 0; };
+    NearbyCounts countAround(int cell, int nearSteps, int farSteps, int roomSteps) const;
+
     // How many open cells the cat could still reach from this cell.
     int roomAround(int cell) const;
 
@@ -93,6 +98,14 @@ protected:
     mutable std::vector<int> scratchTimesReached;
     mutable std::vector<int> scratchFrontier;
     mutable std::vector<int> scratchSteps;
+
+    // "Stamps" let the fast scans skip clearing 441-cell arrays before every scan: each scan
+    // takes a new stamp number, and a cell's entry only counts if it carries that stamp.
+    mutable std::vector<unsigned> visitedStamp;
+    mutable std::vector<unsigned> touchedStamp;
+    mutable std::vector<unsigned> targetStamp;
+    mutable unsigned scanStamp = 0;
+    unsigned newScanStamp() const;
   };
 
   // Everything the cat cares about when deciding where to step.
@@ -168,15 +181,24 @@ protected:
     // builds the search sees less deeply, and this exact check catches what it misses.
     static constexpr int SAFETY_CHECK_MOVES = 3;
     static constexpr int SAFETY_CHECK_WALLS = 12;  // how many of the search's best walls to try
+    // Playouts: after the normal search, the catcher plays its best few walls forward
+    // against a predicted cat (one that moves like bestStepForCat), answering each cat
+    // move with a quick one-move judgment, and keeps the wall whose future ends best.
+    // This sees far further ahead than the search can, and in testing it stopped every
+    // escape by the strongest cats in the class.
+    static constexpr int PLAYOUT_TIME_MS = 40;       // extra thinking time for playouts, on top of the search
+    static constexpr int PLAYOUT_WALLS = 6;          // how many of the search's best walls to play out
+    static constexpr int PLAYOUT_CAT_MOVES = 12;     // how far each playout looks ahead
+    static constexpr int PLAYOUT_SCORE_MARGIN = 200; // only walls the search rates within this of its best
+    static constexpr int PLAYOUT_WALL_CHOICES = 12;  // walls the playout catcher considers each turn
 
     int searchCatTurn(int depthLeft, int alpha, int beta, int movesPlayed);
     int searchCatcherTurn(int depthLeft, int alpha, int beta, int movesPlayed);
     int scorePosition();
+    int playoutScore(int firstWall, std::chrono::steady_clock::time_point stopAt);
     bool catCanForceEscape(int catMovesLeft);
     bool catcherCannotStopEscape(int catMovesLeft);
     bool catWinsLadder(int stepsLeft);
-    int countNearbyExits(int stepsAllowed) const;
-    int countOpenCellsNearCat(int radius) const;
     std::vector<int> catStepsBestFirst() const;
     std::vector<int> catcherWallChoices() const;
     std::vector<int> firstWallChoices() const;
